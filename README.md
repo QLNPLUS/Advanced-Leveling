@@ -2,7 +2,8 @@
 
 Advanced Leveling is an unofficial derivative and continuation of **Auto Leveling** by
 Daripher for Minecraft Forge 1.20.1. It keeps the `autoleveling` mod ID so existing
-worlds, configs, and datapacks remain compatible.
+worlds and datapacks remain compatible. Version 1.0.1 uses new configuration files and
+does not import the original Auto Leveling configuration.
 
 This project is not affiliated with or endorsed by the original author.
 
@@ -14,20 +15,54 @@ This project is not affiliated with or endorsed by the original author.
 - Attribute formulas using `base` and `level` through YiRanExpressionLib.
 - LootJS compatibility for the additional leveled-mob loot table.
 - KubeJS-accessible per-dimension level bonus setters and increment operations.
-- Readable multiline TOML formatting for entity lists and attribute entries.
+- A dedicated, pretty-printed JSON file for attributes and entity lists.
+
+## Configuration files
+
+- `config/advancedleveling-common.toml`: general server and leveling values.
+- `config/advancedleveling-client.toml`: client display settings.
+- `config/advancedleveling.json`: attributes and entity lists.
+
+The old `autoleveling-common.toml` and `autoleveling-client.toml` files are not read.
+This intentional break prevents Forge's TOML writer from collapsing complex lists.
+
+```json
+{
+  "attributes": {
+    "minecraft:generic.movement_speed": 0.001,
+    "minecraft:generic.flying_speed": 0.001,
+    "minecraft:generic.attack_damage": 0.1,
+    "minecraft:generic.armor": 0.1,
+    "minecraft:generic.max_health": "base + (level - 1) * 10",
+    "autoleveling:monster.projectile_damage_bonus": 0.1,
+    "autoleveling:monster.explosion_damage_bonus": 0.1
+  },
+  "mobs": {
+    "blacklist": [
+      "minecraft:ender_dragon"
+    ],
+    "whitelist": [],
+    "hidden_levels": []
+  }
+}
+```
+
+Entity lists accept exact IDs such as `minecraft:zombie` and namespace wildcards such
+as `minecraft:*`. A non-empty whitelist restricts leveling to matching entities.
+Changes to `advancedleveling.json` are loaded on restart or with `/reload`.
 
 ## Attribute expressions
 
-The original numeric mode remains supported:
+The original numeric value mode remains supported in `advancedleveling.json`:
 
-```toml
-["minecraft:generic.max_health", 0.05]
+```json
+"minecraft:generic.max_health": 0.05
 ```
 
 The second value may instead be an expression returning the final target value:
 
-```toml
-["minecraft:generic.max_health", "base + (level - 1) * 10"]
+```json
+"minecraft:generic.max_health": "base + (level - 1) * 10"
 ```
 
 - `base`: the entity's base attribute value.
@@ -51,7 +86,7 @@ Java 17 is required.
 ```
 
 The distributable jar is generated as
-`build/libs/AdvancedLeveling-1.20.1-1.0.0-all.jar`.
+`build/libs/AdvancedLeveling-1.20.1-1.0.1-all.jar`.
 
 YiRanExpressionLib is normally resolved from JitPack. The `libs/maven` directory is
 an optional local Maven fallback; its jar is intentionally not committed.

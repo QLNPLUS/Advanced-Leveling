@@ -1,6 +1,6 @@
 package daripher.autoleveling.item;
 
-import daripher.autoleveling.config.Config;
+import daripher.autoleveling.config.AdvancedConfig;
 import java.util.List;
 import java.util.Objects;
 import net.minecraft.network.chat.Component;
@@ -33,15 +33,11 @@ public class BlacklistToolItem extends Item {
   protected void blacklistEntity(Player player, LivingEntity entity) {
     String id =
         Objects.requireNonNull(ForgeRegistries.ENTITY_TYPES.getKey(entity.getType())).toString();
-    List<String> blacklist = Config.COMMON.blacklistedMobs.get();
-    if (blacklist.contains(id)) {
-      blacklist.remove(id);
+    if (!AdvancedConfig.toggleMobBlacklist(id)) {
       player.sendSystemMessage(Component.translatable(getDescriptionId() + ".removed", id));
     } else {
-      blacklist.add(id);
       player.sendSystemMessage(Component.translatable(getDescriptionId() + ".added", id));
     }
-    Config.COMMON.blacklistedMobs.set(blacklist);
   }
 
   @Override

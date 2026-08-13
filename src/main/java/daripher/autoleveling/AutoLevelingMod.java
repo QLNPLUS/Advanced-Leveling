@@ -1,8 +1,8 @@
 package daripher.autoleveling;
 
 import com.mojang.logging.LogUtils;
+import daripher.autoleveling.config.AdvancedConfig;
 import daripher.autoleveling.config.Config;
-import daripher.autoleveling.config.ConfigFormatter;
 import daripher.autoleveling.init.AutoLevelingAttributes;
 import daripher.autoleveling.init.AutoLevelingItems;
 import daripher.autoleveling.init.AutoLevelingLootItemConditions;
@@ -13,7 +13,6 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
 import net.minecraftforge.fml.common.Mod.EventBusSubscriber.Bus;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import org.slf4j.Logger;
 
@@ -29,6 +28,7 @@ public class AutoLevelingMod {
     AutoLevelingItems.REGISTRY.register(modEventBus);
     AutoLevelingAttributes.REGISTRY.register(modEventBus);
     AutoLevelingTabs.REGISTRY.register(modEventBus);
+    AdvancedConfig.load();
     Config.register();
   }
 
@@ -41,10 +41,5 @@ public class AutoLevelingMod {
               event.add(entityType, AutoLevelingAttributes.PROJECTILE_DAMAGE_MULTIPLIER.get());
               event.add(entityType, AutoLevelingAttributes.EXPLOSION_DAMAGE_MULTIPLIER.get());
             });
-  }
-
-  @SubscribeEvent
-  public static void formatConfig(ModConfigEvent event) {
-    ConfigFormatter.formatCommonConfig(event);
   }
 }

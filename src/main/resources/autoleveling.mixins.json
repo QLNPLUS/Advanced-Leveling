@@ -6,7 +6,7 @@
   "mixins": [
     "LivingEntityAccessor",
     "minecraft/WolfMixin",
-    "neat/HealthBarRendererMixin"
+    "neat.HealthBarRendererMixin"
   ],
   "client": [
     "client.LivingEntityRendererMixin"

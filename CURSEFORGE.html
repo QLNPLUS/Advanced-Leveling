@@ -1,0 +1,134 @@
+<h1>Advanced Mob Leveling</h1>
+
+<p>Advanced Mob Leveling is an unofficial derivative and continuation of <strong>Auto Leveling</strong> by Daripher for Minecraft Forge 1.20.1. It adds precise formula-based attribute scaling, KubeJS level controls, LootJS compatibility, and a redesigned configuration system.</p>
+
+<p>The mod keeps the <code>autoleveling</code> mod ID so existing worlds and datapacks remain compatible. This project is not affiliated with or endorsed by the original author.</p>
+
+<h2>Features</h2>
+
+<ul>
+  <li>Mob levels based on distance, depth, time, dimension, and entity settings</li>
+  <li>Numeric and expression-based attribute scaling</li>
+  <li>Linear, exponential, conditional, and piecewise growth curves</li>
+  <li>KubeJS controls for per-dimension level bonuses</li>
+  <li>LootJS-compatible additional leveled-mob loot</li>
+  <li>Entity blacklists, whitelists, namespace wildcards, and hidden-level lists</li>
+  <li>Pretty-printed JSON for attributes and entity lists</li>
+  <li>Existing Auto Leveling world and datapack compatibility</li>
+</ul>
+
+<h2>Configuration</h2>
+
+<p>Advanced Mob Leveling 1.0.1 uses three configuration files:</p>
+
+<ul>
+  <li><code>config/advancedleveling-common.toml</code>: general server and leveling settings</li>
+  <li><code>config/advancedleveling-client.toml</code>: client display settings</li>
+  <li><code>config/advancedleveling.json</code>: attributes and entity lists</li>
+</ul>
+
+<p><strong>Important upgrade notice:</strong> The old <code>autoleveling-common.toml</code> and <code>autoleveling-client.toml</code> files are not read or migrated. Move any settings you still need to the new files manually.</p>
+
+<p>Example <code>advancedleveling.json</code>:</p>
+
+<pre><code>{
+  "attributes": {
+    "minecraft:generic.movement_speed": 0.001,
+    "minecraft:generic.flying_speed": 0.001,
+    "minecraft:generic.attack_damage": "level &lt;= 10 ? base + (level - 1) * 2 : base + 18 + (level - 10) * 5",
+    "minecraft:generic.armor": 0.1,
+    "minecraft:generic.max_health": "base * (1.05 ^ (level - 1))",
+    "autoleveling:monster.projectile_damage_bonus": 0.1,
+    "autoleveling:monster.explosion_damage_bonus": 0.1
+  },
+  "mobs": {
+    "blacklist": [
+      "minecraft:ender_dragon",
+      "minecraft:wither"
+    ],
+    "whitelist": [],
+    "hidden_levels": []
+  }
+}</code></pre>
+
+<p>Entity lists accept exact IDs such as <code>minecraft:zombie</code> and namespace wildcards such as <code>minecraft:*</code>. When the whitelist is not empty, only matching entities can level. The blacklist takes priority over the whitelist. Changes are loaded on restart or with <code>/reload</code>.</p>
+
+<h2>Attribute Expressions</h2>
+
+<p>A numeric value keeps the original behavior and applies a <code>MULTIPLY_BASE</code> bonus for each level above level 1:</p>
+
+<pre><code>"minecraft:generic.max_health": 0.05</code></pre>
+
+<p>A quoted expression returns the final target attribute value:</p>
+
+<pre><code>"minecraft:generic.max_health": "base + (level - 1) * 10"</code></pre>
+
+<p>Available variables:</p>
+
+<ul>
+  <li><code>base</code>: the entity's original base attribute value</li>
+  <li><code>level</code>: the displayed mob level, starting at 1</li>
+</ul>
+
+<p>Exponential growth uses <code>^</code>:</p>
+
+<pre><code>"minecraft:generic.max_health": "base * (1.05 ^ (level - 1))"</code></pre>
+
+<p>Conditional expressions can create piecewise growth curves:</p>
+
+<pre><code>"minecraft:generic.attack_damage": "level &lt;= 10 ? base + (level - 1) * 2 : base + 18 + (level - 10) * 5"</code></pre>
+
+<p>Datapack <code>attribute_modifiers</code> also support expressions:</p>
+
+<pre><code>{
+  "attribute": "minecraft:generic.max_health",
+  "expression": "base + (level - 1) * 10"
+}</code></pre>
+
+<h2>KubeJS Integration</h2>
+
+<p>The saved level bonus of each dimension can be replaced or incremented from a KubeJS server script:</p>
+
+<pre><code>const ServerLifecycleHooks = Java.loadClass(
+    'net.minecraftforge.server.ServerLifecycleHooks'
+)
+const WorldLevelingData = Java.loadClass(
+    'daripher.autoleveling.saveddata.WorldLevelingData'
+)
+
+let server = ServerLifecycleHooks.getCurrentServer()
+let level = server.getLevel(dimension)
+
+if (level != null) {
+    let levelingData = WorldLevelingData.get(level)
+    levelingData.setLevelBonus(25)
+    levelingData.addLevelBonus(5)
+}</code></pre>
+
+<p><code>setLevelBonus(value)</code> replaces the dimension's saved bonus. <code>addLevelBonus(value)</code> adds to its current bonus. Both methods mark the data for saving automatically.</p>
+
+<h2>LootJS Compatibility</h2>
+
+<p>Loot added through LootJS entity modifiers no longer causes Advanced Mob Leveling's optional additional loot table to execute multiple times. LootJS additions and the <code>autoleveling:gameplay/leveled_mobs</code> loot table can be used together without unintended duplicate drops.</p>
+
+<h2>Requirements and Compatibility</h2>
+
+<ul>
+  <li>Minecraft 1.20.1</li>
+  <li>Minecraft Forge 47 or newer</li>
+  <li>Java 17</li>
+  <li>KubeJS and LootJS are optional</li>
+  <li>YiRanExpressionLib is embedded and does not need to be installed separately</li>
+</ul>
+
+<h2>Attribution and License</h2>
+
+<p>Advanced Mob Leveling is an unofficial derivative of <strong>Auto Leveling</strong> by Daripher. Original portions remain attributed to Daripher and the original contributors. The fork does not imply endorsement by the original author.</p>
+
+<ul>
+  <li>Original project: <a href="https://www.curseforge.com/minecraft/mc-mods/auto-leveling">Auto Leveling on CurseForge</a></li>
+  <li>Source code: <a href="https://github.com/QLNPLUS/Advanced-Leveling">Advanced Leveling on GitHub</a></li>
+  <li>License: GNU AGPLv3</li>
+</ul>
+
+<p>The distributed jar embeds YiRanExpressionLib, which is also licensed under GNU AGPLv3.</p>

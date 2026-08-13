@@ -1,6 +1,7 @@
 package daripher.autoleveling.event;
 
 import daripher.autoleveling.AutoLevelingMod;
+import daripher.autoleveling.config.AdvancedConfig;
 import daripher.autoleveling.config.Config;
 import daripher.autoleveling.data.DimensionsLevelingSettingsReloader;
 import daripher.autoleveling.data.EntitiesLevelingSettingsReloader;
@@ -118,6 +119,7 @@ public class MobsLevelingEvents {
 
   @SubscribeEvent
   public static void reloadSettings(AddReloadListenerEvent event) {
+    AdvancedConfig.load();
     event.addListener(new DimensionsLevelingSettingsReloader());
     event.addListener(new EntitiesLevelingSettingsReloader());
   }
@@ -215,7 +217,7 @@ public class MobsLevelingEvents {
   private static Map<Attribute, AttributeBonus> getAttributeBonuses(LivingEntity entity) {
     LevelingSettings settings = getLevelingSettings(entity);
     if (settings.attributeModifiers().isEmpty()) {
-      return Config.getAttributeBonuses();
+      return AdvancedConfig.getAttributeBonuses();
     }
     return settings.attributeModifiers();
   }
@@ -293,9 +295,9 @@ public class MobsLevelingEvents {
     if (entity.getType() == EntityType.PLAYER) return false;
     ResourceLocation entityId = EntityType.getKey(entity.getType());
     String entityNamespace = entityId.getNamespace();
-    List<String> blacklist = Config.COMMON.blacklistedMobs.get();
+    List<String> blacklist = AdvancedConfig.getMobBlacklist();
     if (blacklist.contains(entityNamespace + ":*")) return false;
-    List<String> whitelist = Config.COMMON.whitelistedMobs.get();
+    List<String> whitelist = AdvancedConfig.getMobWhitelist();
     if (whitelist.contains(entityNamespace + ":*")) return true;
     if (blacklist.contains(entityId.toString())) return false;
     if (!whitelist.isEmpty()) return whitelist.contains(entityId.toString());
@@ -304,7 +306,7 @@ public class MobsLevelingEvents {
 
   public static boolean shouldShowLevel(Entity entity) {
     ResourceLocation entityId = EntityType.getKey(entity.getType());
-    List<String> blacklist = Config.COMMON.blacklistedShownLevels.get();
+    List<String> blacklist = AdvancedConfig.getHiddenLevels();
     if (blacklist.contains(entityId.toString())) return false;
     String namespace = entityId.getNamespace();
     return !blacklist.contains(namespace + ":*");

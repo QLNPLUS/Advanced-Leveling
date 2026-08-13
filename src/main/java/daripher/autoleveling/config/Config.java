@@ -1,17 +1,10 @@
 package daripher.autoleveling.config;
 
-import daripher.autoleveling.AutoLevelingMod;
 import daripher.autoleveling.client.LevelPlatePos;
-import daripher.autoleveling.settings.AttributeBonus;
-import java.util.*;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.ai.attributes.Attribute;
-import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.common.ForgeConfigSpec.ConfigValue;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.registries.ForgeRegistries;
 import org.apache.commons.lang3.tuple.Pair;
 
 public class Config {
@@ -19,7 +12,6 @@ public class Config {
   public static final ForgeConfigSpec COMMON_SPEC;
   public static final Config.Client CLIENT;
   public static final ForgeConfigSpec CLIENT_SPEC;
-  private static final Map<Attribute, AttributeBonus> ATTRIBUTE_BONUSES = new HashMap<>();
 
   static {
     Pair<Config.Common, ForgeConfigSpec> commonSpec =
@@ -32,73 +24,14 @@ public class Config {
     CLIENT = clientSpec.getLeft();
   }
 
-  private static List<List<Object>> getDefaultAttributeBonuses() {
-    List<List<Object>> attributeBonuses = new ArrayList<>();
-    attributeBonuses.add(Arrays.asList("minecraft:generic.movement_speed", 0.001));
-    attributeBonuses.add(Arrays.asList("minecraft:generic.flying_speed", 0.001));
-    attributeBonuses.add(Arrays.asList("minecraft:generic.attack_damage", 0.1));
-    attributeBonuses.add(Arrays.asList("minecraft:generic.armor", 0.1));
-    attributeBonuses.add(Arrays.asList("minecraft:generic.max_health", 0.1));
-    attributeBonuses.add(Arrays.asList("autoleveling:monster.projectile_damage_bonus", 0.1));
-    attributeBonuses.add(Arrays.asList("autoleveling:monster.explosion_damage_bonus", 0.1));
-    return attributeBonuses;
-  }
-
-  private static <T> boolean isValidAttributeBonus(T object) {
-    if (object instanceof List<?> list) {
-      boolean validShape =
-          list.size() == 2
-          && list.get(0) instanceof String
-          && (list.get(1) instanceof Double || list.get(1) instanceof String);
-      if (!validShape) return false;
-      if (list.get(1) instanceof String expression) {
-        try {
-          AttributeBonus.expression(expression);
-        } catch (RuntimeException exception) {
-          return false;
-        }
-      }
-      return true;
-    }
-    return false;
-  }
-
-  public static Map<Attribute, AttributeBonus> getAttributeBonuses() {
-    if (ATTRIBUTE_BONUSES.isEmpty()) {
-      for (List<Object> objects : Config.COMMON.attributesBonuses.get()) {
-        readAttributeBonus(objects);
-      }
-    }
-    return ATTRIBUTE_BONUSES;
-  }
-
-  private static void readAttributeBonus(List<Object> attributeBonusConfig) {
-    ResourceLocation attributeId = new ResourceLocation((String) attributeBonusConfig.get(0));
-    Attribute attribute = ForgeRegistries.ATTRIBUTES.getValue(attributeId);
-    Object configuredBonus = attributeBonusConfig.get(1);
-    if (attribute == null) {
-      AutoLevelingMod.LOGGER.error("Attribute '" + attributeId + "' can not be found!");
-      return;
-    }
-    AttributeBonus modifier =
-        configuredBonus instanceof String expression
-            ? AttributeBonus.expression(expression)
-            : AttributeBonus.numeric(
-                ((Double) configuredBonus).doubleValue(),
-                AttributeModifier.Operation.MULTIPLY_BASE);
-    ATTRIBUTE_BONUSES.put(attribute, modifier);
-  }
-
   public static void register() {
-    ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, Config.COMMON_SPEC);
-    ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, Config.CLIENT_SPEC);
+    ModLoadingContext.get()
+        .registerConfig(ModConfig.Type.COMMON, Config.COMMON_SPEC, "advancedleveling-common.toml");
+    ModLoadingContext.get()
+        .registerConfig(ModConfig.Type.CLIENT, Config.CLIENT_SPEC, "advancedleveling-client.toml");
   }
 
   public static class Common {
-    public final ConfigValue<List<? extends List<Object>>> attributesBonuses;
-    public final ConfigValue<List<String>> blacklistedMobs;
-    public final ConfigValue<List<String>> whitelistedMobs;
-    public final ConfigValue<List<String>> blacklistedShownLevels;
     public final ConfigValue<Integer> startingLevel;
     public final ConfigValue<Integer> maxLevel;
     public final ConfigValue<Integer> randomLevelBonus;
@@ -113,35 +46,9 @@ public class Config {
 
     public Common(ForgeConfigSpec.Builder builder) {
       builder.push("Mobs");
-      builder.comment("Example: [\"minecraft:zombie\", \"minecraft:skeleton\"]");
-      blacklistedMobs =
-          builder.define("List of mobs that shouldn't be able to level up", new ArrayList<>());
-      builder.comment("If this list is not empty only these mobs will be able to level up");
-      builder.comment("Example: [\"minecraft:zombie\", \"minecraft:skeleton\"]");
-      whitelistedMobs =
-          builder.define("List of mobs that should be able to level up", new ArrayList<>());
       alwaysShowLevel = builder.define("Always show mobs levels", false);
       showLevelWhenLookingAt = builder.define("Only show levels when you look at the mob", true);
       expBonus = builder.define("Bonus experience per level", 0.1D);
-      blacklistedShownLevels =
-          builder.define(
-              "List of mobs that should have their levels always hidden", new ArrayList<>());
-      builder.pop();
-      builder.push("Attributes");
-      builder.comment("Each entry is [attribute ID, numeric bonus or expression].");
-      builder.comment(
-          "Numeric mode keeps the original behavior: the number is a MULTIPLY_BASE bonus per level above level 1.");
-      builder.comment(
-          "Expression mode: use a quoted expression that returns the final target attribute value.");
-      builder.comment(
-          "Expression variables: base = the entity's base attribute value; level = the displayed level starting at 1.");
-      builder.comment(
-          "Examples: [\"minecraft:generic.max_health\", 0.05] or [\"minecraft:generic.max_health\", \"base + (level - 1) * 10\"]");
-      attributesBonuses =
-          builder.defineList(
-              "Attributes bonuses per one level",
-              Config::getDefaultAttributeBonuses,
-              Config::isValidAttributeBonus);
       builder.pop();
       builder.push("Default levelling settings");
       startingLevel = builder.define("Starting level", 1);

@@ -1,6 +1,6 @@
 package daripher.autoleveling.item;
 
-import daripher.autoleveling.config.Config;
+import daripher.autoleveling.config.AdvancedConfig;
 import java.util.List;
 import java.util.Objects;
 import net.minecraft.network.chat.Component;
@@ -33,15 +33,11 @@ public class WhitelistToolItem extends Item {
   protected void whitelistEntity(Player player, LivingEntity entity) {
     String id =
         Objects.requireNonNull(ForgeRegistries.ENTITY_TYPES.getKey(entity.getType())).toString();
-    List<String> whitelist = Config.COMMON.whitelistedMobs.get();
-    if (whitelist.contains(id)) {
-      whitelist.remove(id);
+    if (!AdvancedConfig.toggleMobWhitelist(id)) {
       player.sendSystemMessage(Component.translatable(getDescriptionId() + ".removed", id));
     } else {
-      whitelist.add(id);
       player.sendSystemMessage(Component.translatable(getDescriptionId() + ".added", id));
     }
-    Config.COMMON.whitelistedMobs.set(whitelist);
   }
 
   @Override

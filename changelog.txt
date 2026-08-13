@@ -1,3 +1,12 @@
+Advanced Leveling 1.0.1
+  Replaced complex NightConfig TOML lists with config/advancedleveling.json
+  Added stable pretty-printed formatting for attributes and entity lists
+  Renamed the simple Forge config files to advancedleveling-common.toml and advancedleveling-client.toml
+  Added /reload support for advancedleveling.json
+  Updated the blacklist and whitelist tools to save changes directly to advancedleveling.json
+  Removed the unreliable TOML post-save formatting hooks
+  Breaking config change: old autoleveling-common.toml and autoleveling-client.toml files are no longer read or migrated
+
 Advanced Leveling 1.0.0
   Renamed the maintained fork to Advanced Leveling
   Added expression-based attribute scaling with base and level variables
