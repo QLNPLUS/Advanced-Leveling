@@ -73,14 +73,14 @@ public class MobsLevelingEvents {
     if (!shouldSetLevel(event.getEntity())) return;
     LivingEntity entity = (LivingEntity) event.getEntity();
     if (hasLevel(entity)) {
-      applyAttributeBonuses(entity);
+      applyAttributeBonuses(entity, false);
       return;
     }
     BlockPos spawnPos = getSpawnPosition(entity);
     double distanceToSpawn = Math.sqrt(spawnPos.distSqr(entity.blockPosition()));
     int level = createLevelForEntity(entity, distanceToSpawn);
     setLevel(entity, level);
-    applyAttributeBonuses(entity);
+    applyAttributeBonuses(entity, true);
     addEquipment(entity);
   }
 
@@ -205,8 +205,13 @@ public class MobsLevelingEvents {
   }
 
   public static void applyAttributeBonuses(LivingEntity entity) {
+    applyAttributeBonuses(entity, true);
+  }
+
+  private static void applyAttributeBonuses(LivingEntity entity, boolean restoreHealth) {
     getAttributeBonuses(entity)
-        .forEach((attribute, bonus) -> applyAttributeBonus(entity, attribute, bonus));
+        .forEach(
+            (attribute, bonus) -> applyAttributeBonus(entity, attribute, bonus, restoreHealth));
   }
 
   private static Map<Attribute, AttributeBonus> getAttributeBonuses(LivingEntity entity) {
@@ -218,7 +223,7 @@ public class MobsLevelingEvents {
   }
 
   private static void applyAttributeBonus(
-      LivingEntity entity, Attribute attribute, AttributeBonus bonus) {
+      LivingEntity entity, Attribute attribute, AttributeBonus bonus, boolean restoreHealth) {
     AttributeInstance attributeInstance =
         entity.getAttribute(BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute));
     if (attributeInstance == null) {
@@ -229,7 +234,7 @@ public class MobsLevelingEvents {
     int level = getLevel(entity);
     AttributeModifier modifier = bonus.createModifier(attributeInstance.getBaseValue(), level);
     attributeInstance.addPermanentModifier(modifier);
-    if (attribute == Attributes.MAX_HEALTH.value()) {
+    if (restoreHealth && attribute == Attributes.MAX_HEALTH.value()) {
       entity.setHealth(entity.getMaxHealth());
     }
   }
