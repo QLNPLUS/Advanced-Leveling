@@ -14,7 +14,7 @@ import snownee.jade.api.config.IPluginConfig;
 public enum LevelComponentProvider implements IEntityComponentProvider {
   INSTANCE;
 
-  private static final ResourceLocation ID = new ResourceLocation(AutoLevelingMod.MOD_ID, "level");
+  private static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(AutoLevelingMod.MOD_ID, "level");
 
   @Override
   public ResourceLocation getUid() {

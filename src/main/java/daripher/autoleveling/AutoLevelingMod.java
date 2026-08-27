@@ -7,13 +7,13 @@ import daripher.autoleveling.init.AutoLevelingAttributes;
 import daripher.autoleveling.init.AutoLevelingItems;
 import daripher.autoleveling.init.AutoLevelingLootItemConditions;
 import daripher.autoleveling.init.AutoLevelingTabs;
-import net.minecraftforge.event.entity.EntityAttributeModificationEvent;
-import net.minecraftforge.eventbus.api.IEventBus;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
-import net.minecraftforge.fml.common.Mod.EventBusSubscriber.Bus;
-import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
+import net.neoforged.neoforge.event.entity.EntityAttributeModificationEvent;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.common.EventBusSubscriber.Bus;
+import net.neoforged.fml.ModContainer;
 import org.slf4j.Logger;
 
 @EventBusSubscriber(bus = Bus.MOD)
@@ -22,14 +22,13 @@ public class AutoLevelingMod {
   public static final Logger LOGGER = LogUtils.getLogger();
   public static final String MOD_ID = "autoleveling";
 
-  public AutoLevelingMod() {
-    IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+  public AutoLevelingMod(IEventBus modEventBus, ModContainer modContainer) {
     AutoLevelingLootItemConditions.REGISTRY.register(modEventBus);
     AutoLevelingItems.REGISTRY.register(modEventBus);
     AutoLevelingAttributes.REGISTRY.register(modEventBus);
     AutoLevelingTabs.REGISTRY.register(modEventBus);
     AdvancedConfig.load();
-    Config.register();
+    Config.register(modContainer);
   }
 
   @SubscribeEvent

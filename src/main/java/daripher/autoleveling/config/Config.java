@@ -1,34 +1,32 @@
 package daripher.autoleveling.config;
 
 import daripher.autoleveling.client.LevelPlatePos;
-import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.common.ForgeConfigSpec.ConfigValue;
-import net.minecraftforge.fml.ModLoadingContext;
-import net.minecraftforge.fml.config.ModConfig;
+import net.neoforged.neoforge.common.ModConfigSpec;
+import net.neoforged.neoforge.common.ModConfigSpec.ConfigValue;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.config.ModConfig;
 import org.apache.commons.lang3.tuple.Pair;
 
 public class Config {
   public static final Config.Common COMMON;
-  public static final ForgeConfigSpec COMMON_SPEC;
+  public static final ModConfigSpec COMMON_SPEC;
   public static final Config.Client CLIENT;
-  public static final ForgeConfigSpec CLIENT_SPEC;
+  public static final ModConfigSpec CLIENT_SPEC;
 
   static {
-    Pair<Config.Common, ForgeConfigSpec> commonSpec =
-        new ForgeConfigSpec.Builder().configure(Config.Common::new);
+    Pair<Config.Common, ModConfigSpec> commonSpec =
+        new ModConfigSpec.Builder().configure(Config.Common::new);
     COMMON_SPEC = commonSpec.getRight();
     COMMON = commonSpec.getLeft();
-    Pair<Config.Client, ForgeConfigSpec> clientSpec =
-        new ForgeConfigSpec.Builder().configure(Config.Client::new);
+    Pair<Config.Client, ModConfigSpec> clientSpec =
+        new ModConfigSpec.Builder().configure(Config.Client::new);
     CLIENT_SPEC = clientSpec.getRight();
     CLIENT = clientSpec.getLeft();
   }
 
-  public static void register() {
-    ModLoadingContext.get()
-        .registerConfig(ModConfig.Type.COMMON, Config.COMMON_SPEC, "advancedleveling-common.toml");
-    ModLoadingContext.get()
-        .registerConfig(ModConfig.Type.CLIENT, Config.CLIENT_SPEC, "advancedleveling-client.toml");
+  public static void register(ModContainer container) {
+    container.registerConfig(ModConfig.Type.COMMON, Config.COMMON_SPEC, "advancedleveling-common.toml");
+    container.registerConfig(ModConfig.Type.CLIENT, Config.CLIENT_SPEC, "advancedleveling-client.toml");
   }
 
   public static class Common {
@@ -44,7 +42,7 @@ public class Config {
     public final ConfigValue<Boolean> alwaysShowLevel;
     public final ConfigValue<Boolean> showLevelWhenLookingAt;
 
-    public Common(ForgeConfigSpec.Builder builder) {
+    public Common(ModConfigSpec.Builder builder) {
       builder.push("Mobs");
       alwaysShowLevel = builder.define("Always show mobs levels", false);
       showLevelWhenLookingAt = builder.define("Only show levels when you look at the mob", true);
@@ -78,7 +76,7 @@ public class Config {
     public final ConfigValue<Integer> levelTextShiftX;
     public final ConfigValue<Integer> levelTextShiftY;
 
-    public Client(ForgeConfigSpec.Builder builder) {
+    public Client(ModConfigSpec.Builder builder) {
       builder.push("Visuals");
       levelTextColor = builder.define("Level text color", "#1cff27", Config.Client::isColorString);
       levelTextPosition = builder.defineEnum("Level text position", LevelPlatePos.LEFT);

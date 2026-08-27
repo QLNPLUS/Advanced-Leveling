@@ -14,7 +14,7 @@ import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.storage.loot.Deserializers;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
@@ -29,7 +29,7 @@ public class EntitiesLevelingSettingsReloader extends SimpleJsonResourceReloadLi
 
   @Nullable
   public static EntityLevelingSettings get(EntityType<?> entityType) {
-    return SETTINGS.get(ForgeRegistries.ENTITY_TYPES.getKey(entityType));
+    return SETTINGS.get(BuiltInRegistries.ENTITY_TYPES.getKey(entityType));
   }
 
   @Override

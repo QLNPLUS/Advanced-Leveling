@@ -12,12 +12,12 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
 import net.minecraft.world.entity.EntityType;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.RegisterClientReloadListenersEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
-import net.minecraftforge.fml.common.Mod.EventBusSubscriber.Bus;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.common.EventBusSubscriber.Bus;
+import net.minecraft.core.registries.BuiltInRegistries;
 import org.slf4j.Logger;
 
 @EventBusSubscriber(bus = Bus.MOD, value = Dist.CLIENT)
@@ -77,8 +77,8 @@ public enum LeveledMobsTextures implements ResourceManagerReloadListener {
     String[] splitTextureName = textureName.split("_");
     String entityTypeName = splitTextureName[0];
     ResourceLocation entityTypeId =
-        new ResourceLocation(textureLocation.getNamespace(), entityTypeName);
-    EntityType<?> entityType = ForgeRegistries.ENTITY_TYPES.getValue(entityTypeId);
+        ResourceLocation.parse(textureLocation.getNamespace(), entityTypeName);
+    EntityType<?> entityType = BuiltInRegistries.ENTITY_TYPE.get(entityTypeId);
     if (entityType == null) {
       LOGGER.warn(
           "Can't read texture {}, unknown entity type {} specified", textureLocation, entityTypeId);

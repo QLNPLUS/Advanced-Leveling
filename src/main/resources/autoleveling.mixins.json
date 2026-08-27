@@ -1,18 +1,12 @@
 {
   "required": true,
   "minVersion": "0.8",
-  "compatibilityLevel": "JAVA_17",
+  "compatibilityLevel": "JAVA_21",
   "package": "daripher.autoleveling.mixin",
-  "mixins": [
-    "LivingEntityAccessor",
-    "minecraft/WolfMixin",
-    "neat.HealthBarRendererMixin"
-  ],
-  "client": [
-    "client.LivingEntityRendererMixin"
-  ],
+  "mixins": [],
+  "client": [],
   "injectors": {
     "defaultRequire": 1
   },
-  "refmap": "autoleveling.refmap.json"
+  "refmap": null
 }

@@ -8,8 +8,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
-import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.neoforged.neoforge.common.ModConfigSpec;
+import net.minecraft.core.registries.BuiltInRegistries;
 import org.jetbrains.annotations.Nullable;
 
 public interface LevelingSettings {
@@ -49,8 +49,8 @@ public interface LevelingSettings {
   }
 
   static Attribute readAttribute(JsonObject jsonObject) {
-    ResourceLocation attributeId = new ResourceLocation(jsonObject.get("attribute").getAsString());
-    return ForgeRegistries.ATTRIBUTES.getValue(attributeId);
+    ResourceLocation attributeId = ResourceLocation.parse(jsonObject.get("attribute").getAsString());
+    return BuiltInRegistries.ATTRIBUTE.get(attributeId);
   }
 
   static AttributeBonus readAttributeModifier(JsonObject jsonObject) {
@@ -77,7 +77,7 @@ public interface LevelingSettings {
   }
 
   static float readOptionalFloat(
-      JsonObject jsonObject, String name, ForgeConfigSpec.ConfigValue<Double> alternative) {
+      JsonObject jsonObject, String name, ModConfigSpec.ConfigValue<Double> alternative) {
     if (!jsonObject.has(name)) {
       return alternative.get().floatValue();
     }

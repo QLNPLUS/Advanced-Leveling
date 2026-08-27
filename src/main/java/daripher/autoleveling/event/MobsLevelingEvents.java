@@ -7,8 +7,6 @@ import daripher.autoleveling.data.DimensionsLevelingSettingsReloader;
 import daripher.autoleveling.data.EntitiesLevelingSettingsReloader;
 import daripher.autoleveling.init.AutoLevelingAttributes;
 import daripher.autoleveling.mixin.LivingEntityAccessor;
-import daripher.autoleveling.network.NetworkDispatcher;
-import daripher.autoleveling.network.message.SyncLevelingData;
 import daripher.autoleveling.saveddata.GlobalLevelingData;
 import daripher.autoleveling.saveddata.WorldLevelingData;
 import daripher.autoleveling.settings.DimensionLevelingSettings;
@@ -43,18 +41,17 @@ import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSet;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-import net.minecraftforge.event.AddReloadListenerEvent;
-import net.minecraftforge.event.entity.EntityJoinLevelEvent;
-import net.minecraftforge.event.entity.living.LivingDropsEvent;
-import net.minecraftforge.event.entity.living.LivingExperienceDropEvent;
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
-import net.minecraftforge.eventbus.api.EventPriority;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod.EventBusSubscriber;
-import net.minecraftforge.network.PacketDistributor;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.neoforge.event.AddReloadListenerEvent;
+import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
+import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
+import net.neoforged.neoforge.event.entity.living.LivingExperienceDropEvent;
+import net.neoforged.neoforge.event.entity.living.LivingHurtEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.bus.api.EventPriority;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 
 @EventBusSubscriber(modid = AutoLevelingMod.MOD_ID)
 public class MobsLevelingEvents {
@@ -108,7 +105,7 @@ public class MobsLevelingEvents {
     LivingEntity entity = event.getEntity();
     if (!hasLevel(entity)) return;
     ResourceLocation lootTableId =
-        new ResourceLocation(AutoLevelingMod.MOD_ID, "gameplay/leveled_mobs");
+        ResourceLocation.fromNamespaceAndPath(AutoLevelingMod.MOD_ID, "gameplay/leveled_mobs");
     MinecraftServer server = entity.level().getServer();
     if (server == null) return;
     LootTable lootTable = server.getLootData().getLootTable(lootTableId);
@@ -122,15 +119,6 @@ public class MobsLevelingEvents {
     AdvancedConfig.load();
     event.addListener(new DimensionsLevelingSettingsReloader());
     event.addListener(new EntitiesLevelingSettingsReloader());
-  }
-
-  @SubscribeEvent
-  public static void syncEntityLevel(PlayerEvent.StartTracking event) {
-    if (!hasLevel(event.getTarget())) return;
-    LivingEntity entity = (LivingEntity) event.getTarget();
-    ServerPlayer player = (ServerPlayer) event.getEntity();
-    PacketDistributor.PacketTarget packetTarget = PacketDistributor.PLAYER.with(() -> player);
-    NetworkDispatcher.network_channel.send(packetTarget, new SyncLevelingData(entity));
   }
 
   @SubscribeEvent
@@ -258,7 +246,7 @@ public class MobsLevelingEvents {
   private static ResourceLocation getEquipmentTableId(
       EquipmentSlot slot, ResourceLocation entityId) {
     String path = "equipment/" + entityId.getPath() + "_" + slot.getName();
-    return new ResourceLocation(entityId.getNamespace(), path);
+    return ResourceLocation.parse(entityId.getNamespace(), path);
   }
 
   private static LootParams createLootParams(LivingEntity entity, DamageSource damageSource) {

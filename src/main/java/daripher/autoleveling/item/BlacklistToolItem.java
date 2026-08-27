@@ -12,7 +12,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
-import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraft.core.registries.BuiltInRegistries;
 import org.jetbrains.annotations.NotNull;
 
 public class BlacklistToolItem extends Item {
@@ -32,7 +32,7 @@ public class BlacklistToolItem extends Item {
 
   protected void blacklistEntity(Player player, LivingEntity entity) {
     String id =
-        Objects.requireNonNull(ForgeRegistries.ENTITY_TYPES.getKey(entity.getType())).toString();
+        Objects.requireNonNull(BuiltInRegistries.ENTITY_TYPES.getKey(entity.getType())).toString();
     if (!AdvancedConfig.toggleMobBlacklist(id)) {
       player.sendSystemMessage(Component.translatable(getDescriptionId() + ".removed", id));
     } else {

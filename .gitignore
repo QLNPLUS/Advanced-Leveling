@@ -17,6 +17,7 @@ out
 build
 .gradle
 .gradle-codex
+.port-reference
 
 # other
 eclipse
@@ -24,6 +25,7 @@ run
 
 # Local Maven fallback used when JitPack is unavailable
 libs/maven/
+libs/*.jar
 
 # Files from Forge MDK
 forge*changelog.txt

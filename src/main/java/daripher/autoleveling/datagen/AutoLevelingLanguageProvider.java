@@ -6,7 +6,7 @@ import daripher.autoleveling.AutoLevelingMod;
 import daripher.autoleveling.init.AutoLevelingItems;
 import net.minecraft.data.PackOutput;
 import net.minecraft.world.item.Item;
-import net.minecraftforge.common.data.LanguageProvider;
+import net.neoforged.neoforge.common.data.LanguageProvider;
 
 public class AutoLevelingLanguageProvider extends LanguageProvider {
   public AutoLevelingLanguageProvider(PackOutput packOutput) {
