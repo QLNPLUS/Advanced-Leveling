@@ -229,7 +229,9 @@ public class MobsLevelingEvents {
     int level = getLevel(entity);
     AttributeModifier modifier = bonus.createModifier(attributeInstance.getBaseValue(), level);
     attributeInstance.addPermanentModifier(modifier);
-    if (attribute == Attributes.MAX_HEALTH) entity.heal(entity.getMaxHealth());
+    if (attribute == Attributes.MAX_HEALTH.value()) {
+      entity.setHealth(entity.getMaxHealth());
+    }
   }
 
   public static void addEquipment(LivingEntity entity) {

@@ -1,11 +1,8 @@
 package daripher.autoleveling.integration.jade;
 
 import daripher.autoleveling.AutoLevelingMod;
-import daripher.autoleveling.event.MobsLevelingEvents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
 import snownee.jade.api.EntityAccessor;
 import snownee.jade.api.IEntityComponentProvider;
 import snownee.jade.api.ITooltip;
@@ -24,11 +21,8 @@ public enum LevelComponentProvider implements IEntityComponentProvider {
   @Override
   public void appendTooltip(
       ITooltip tooltip, EntityAccessor entityAccessor, IPluginConfig pluginConfig) {
-    Entity entity = entityAccessor.getEntity();
-    boolean showLevel =
-        MobsLevelingEvents.hasLevel(entity) && MobsLevelingEvents.shouldShowLevel(entity);
-    if (!showLevel) return;
-    int level = MobsLevelingEvents.getLevel((LivingEntity) entity) + 1;
+    if (!entityAccessor.getServerData().contains(LevelDataProvider.LEVEL_TAG)) return;
+    int level = entityAccessor.getServerData().getInt(LevelDataProvider.LEVEL_TAG);
     tooltip.add(Component.translatable("jade.autoleveling.tooltip", level));
   }
 }
