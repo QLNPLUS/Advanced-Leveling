@@ -21,8 +21,8 @@ public enum LevelComponentProvider implements IEntityComponentProvider {
   @Override
   public void appendTooltip(
       ITooltip tooltip, EntityAccessor entityAccessor, IPluginConfig pluginConfig) {
-    if (!entityAccessor.getServerData().contains(LevelDataProvider.LEVEL_TAG)) return;
-    int level = entityAccessor.getServerData().getInt(LevelDataProvider.LEVEL_TAG);
+    if (!entityAccessor.getServerData().contains(LevelDataProvider.DATA_KEY)) return;
+    int level = entityAccessor.getServerData().getInt(LevelDataProvider.DATA_KEY);
     tooltip.add(Component.translatable("jade.autoleveling.tooltip", level));
   }
 }

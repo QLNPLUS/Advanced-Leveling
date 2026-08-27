@@ -11,9 +11,9 @@ import snownee.jade.api.IServerDataProvider;
 public enum LevelDataProvider implements IServerDataProvider<EntityAccessor> {
   INSTANCE;
 
-  static final String LEVEL_TAG = "Level";
   private static final ResourceLocation ID =
       ResourceLocation.fromNamespaceAndPath(AutoLevelingMod.MOD_ID, "level");
+  static final String DATA_KEY = ID.toString();
 
   @Override
   public ResourceLocation getUid() {
@@ -27,7 +27,7 @@ public enum LevelDataProvider implements IServerDataProvider<EntityAccessor> {
         || !MobsLevelingEvents.shouldShowLevel(livingEntity)) {
       return;
     }
-    data.putInt(LEVEL_TAG, MobsLevelingEvents.getLevel(livingEntity) + 1);
+    data.putInt(DATA_KEY, MobsLevelingEvents.getLevel(livingEntity) + 1);
   }
 
   @Override
