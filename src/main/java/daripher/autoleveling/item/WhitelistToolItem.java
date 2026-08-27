@@ -32,7 +32,7 @@ public class WhitelistToolItem extends Item {
 
   protected void whitelistEntity(Player player, LivingEntity entity) {
     String id =
-        Objects.requireNonNull(BuiltInRegistries.ENTITY_TYPES.getKey(entity.getType())).toString();
+        Objects.requireNonNull(BuiltInRegistries.ENTITY_TYPE.getKey(entity.getType())).toString();
     if (!AdvancedConfig.toggleMobWhitelist(id)) {
       player.sendSystemMessage(Component.translatable(getDescriptionId() + ".removed", id));
     } else {
@@ -43,7 +43,7 @@ public class WhitelistToolItem extends Item {
   @Override
   public void appendHoverText(
       @NotNull ItemStack itemStack,
-      Level level,
+      Item.TooltipContext context,
       List<Component> components,
       @NotNull TooltipFlag tooltipFlag) {
     components.add(Component.translatable(getDescriptionId() + ".tooltip"));

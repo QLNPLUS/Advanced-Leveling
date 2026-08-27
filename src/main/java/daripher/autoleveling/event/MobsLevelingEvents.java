@@ -19,6 +19,8 @@ import javax.annotation.Nonnull;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -47,7 +49,7 @@ import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingExperienceDropEvent;
-import net.neoforged.neoforge.event.entity.living.LivingHurtEvent;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -61,8 +63,8 @@ public class MobsLevelingEvents {
           .required(LootContextParams.THIS_ENTITY)
           .required(LootContextParams.ORIGIN)
           .required(LootContextParams.DAMAGE_SOURCE)
-          .optional(LootContextParams.KILLER_ENTITY)
-          .optional(LootContextParams.DIRECT_KILLER_ENTITY)
+          .optional(LootContextParams.ATTACKING_ENTITY)
+          .optional(LootContextParams.DIRECT_ATTACKING_ENTITY)
           .optional(LootContextParams.LAST_DAMAGE_PLAYER)
           .build();
 
@@ -102,13 +104,16 @@ public class MobsLevelingEvents {
 
   @SubscribeEvent
   public static void dropAdditionalLoot(LivingDropsEvent event) {
+    if (!Config.COMMON.enableAdditionalLoot.get()) return;
     LivingEntity entity = event.getEntity();
     if (!hasLevel(entity)) return;
-    ResourceLocation lootTableId =
-        ResourceLocation.fromNamespaceAndPath(AutoLevelingMod.MOD_ID, "gameplay/leveled_mobs");
+    ResourceKey<LootTable> lootTableId =
+        ResourceKey.create(
+            net.minecraft.core.registries.Registries.LOOT_TABLE,
+            ResourceLocation.fromNamespaceAndPath(AutoLevelingMod.MOD_ID, "gameplay/leveled_mobs"));
     MinecraftServer server = entity.level().getServer();
     if (server == null) return;
-    LootTable lootTable = server.getLootData().getLootTable(lootTableId);
+    LootTable lootTable = server.reloadableRegistries().getLootTable(lootTableId);
     if (lootTable == LootTable.EMPTY) return;
     LootParams lootParams = createLootParams(entity, event.getSource());
     lootTable.getRandomItems(lootParams, entity::spawnAtLocation);
@@ -122,7 +127,7 @@ public class MobsLevelingEvents {
   }
 
   @SubscribeEvent
-  public static void applyAttributesDamageBonus(LivingHurtEvent event) {
+  public static void applyAttributesDamageBonus(LivingIncomingDamageEvent event) {
     DamageSource damage = event.getSource();
     if (!(damage.getEntity() instanceof LivingEntity attacker)) return;
     float multiplier = getDamageMultiplier(damage, attacker);
@@ -131,17 +136,18 @@ public class MobsLevelingEvents {
 
   public static float getDamageMultiplier(DamageSource damage, LivingEntity attacker) {
     if (damage.is(DamageTypeTags.IS_PROJECTILE)) {
-      return getAttributeValue(attacker, AutoLevelingAttributes.PROJECTILE_DAMAGE_MULTIPLIER.get());
+      return getAttributeValue(attacker, AutoLevelingAttributes.PROJECTILE_DAMAGE_MULTIPLIER);
     }
     if (damage.is(DamageTypeTags.IS_EXPLOSION)) {
-      return getAttributeValue(attacker, AutoLevelingAttributes.EXPLOSION_DAMAGE_MULTIPLIER.get());
+      return getAttributeValue(attacker, AutoLevelingAttributes.EXPLOSION_DAMAGE_MULTIPLIER);
     }
     return 1F;
   }
 
-  private static float getAttributeValue(LivingEntity entity, Attribute damageBonusAttribute) {
-    if (entity.getAttribute(damageBonusAttribute) == null) return 0F;
-    return (float) Objects.requireNonNull(entity.getAttribute(damageBonusAttribute)).getValue();
+  private static float getAttributeValue(
+      LivingEntity entity, net.minecraft.core.Holder<Attribute> damageBonusAttribute) {
+    AttributeInstance instance = entity.getAttribute(damageBonusAttribute);
+    return instance == null ? 0F : (float) instance.getValue();
   }
 
   @OnlyIn(Dist.CLIENT)
@@ -181,6 +187,7 @@ public class MobsLevelingEvents {
     if (levelBonus > 0) monsterLevel += entity.getRandom().nextInt(levelBonus);
     monsterLevel = Math.abs(monsterLevel);
     monsterLevel += WorldLevelingData.get((ServerLevel) entity.level()).getLevelBonus();
+    monsterLevel += Config.COMMON.levelBonus.get();
     if (maxLevel > 0) monsterLevel = Math.min(monsterLevel, maxLevel - 1);
     GlobalLevelingData globalLevelingData = GlobalLevelingData.get(server);
     monsterLevel += globalLevelingData.getLevelBonus();
@@ -212,7 +219,8 @@ public class MobsLevelingEvents {
 
   private static void applyAttributeBonus(
       LivingEntity entity, Attribute attribute, AttributeBonus bonus) {
-    AttributeInstance attributeInstance = entity.getAttribute(attribute);
+    AttributeInstance attributeInstance =
+        entity.getAttribute(BuiltInRegistries.ATTRIBUTE.wrapAsHolder(attribute));
     if (attributeInstance == null) {
       return;
     }
@@ -239,14 +247,16 @@ public class MobsLevelingEvents {
       MinecraftServer server, LivingEntity entity, EquipmentSlot slot) {
     ResourceLocation entityId = EntityType.getKey(entity.getType());
     ResourceLocation lootTableId = getEquipmentTableId(slot, entityId);
-    return server.getLootData().getLootTable(lootTableId);
+    ResourceKey<LootTable> key =
+        ResourceKey.create(Registries.LOOT_TABLE, lootTableId);
+    return server.reloadableRegistries().getLootTable(key);
   }
 
   @Nonnull
   private static ResourceLocation getEquipmentTableId(
       EquipmentSlot slot, ResourceLocation entityId) {
     String path = "equipment/" + entityId.getPath() + "_" + slot.getName();
-    return ResourceLocation.parse(entityId.getNamespace(), path);
+    return ResourceLocation.fromNamespaceAndPath(entityId.getNamespace(), path);
   }
 
   private static LootParams createLootParams(LivingEntity entity, DamageSource damageSource) {
@@ -257,9 +267,9 @@ public class MobsLevelingEvents {
             .withParameter(LootContextParams.THIS_ENTITY, entity)
             .withParameter(LootContextParams.ORIGIN, entity.position())
             .withParameter(LootContextParams.DAMAGE_SOURCE, damageSource)
-            .withOptionalParameter(LootContextParams.KILLER_ENTITY, damageSource.getEntity())
+            .withOptionalParameter(LootContextParams.ATTACKING_ENTITY, damageSource.getEntity())
             .withOptionalParameter(
-                LootContextParams.DIRECT_KILLER_ENTITY, damageSource.getDirectEntity());
+                LootContextParams.DIRECT_ATTACKING_ENTITY, damageSource.getDirectEntity());
     int lastHurtByPlayerTime = accessor.getLastHurtByPlayerTime();
     Player lastHurtByPlayer = accessor.getLastHurtByPlayer();
     if (lastHurtByPlayerTime > 0 && lastHurtByPlayer != null) {

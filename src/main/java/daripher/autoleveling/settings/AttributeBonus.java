@@ -2,14 +2,14 @@ package daripher.autoleveling.settings;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.yiran.expressionlib.expr.Expression;
 import net.yiran.expressionlib.expr.ExpressionBuilder;
 
 public final class AttributeBonus {
-  public static final UUID MODIFIER_ID =
-      UUID.fromString("6a102cb4-d735-4cb7-8ab2-3d383219a44e");
+  public static final ResourceLocation MODIFIER_ID =
+      ResourceLocation.fromNamespaceAndPath("autoleveling", "level");
   private static final Set<String> VARIABLES = Set.of("base", "level");
 
   private final double amountPerLevel;
@@ -33,7 +33,7 @@ public final class AttributeBonus {
       throw new IllegalArgumentException(
           "Attribute expression may only use variables 'base' and 'level': " + source);
     }
-    return new AttributeBonus(0, AttributeModifier.Operation.ADDITION, expression);
+    return new AttributeBonus(0, AttributeModifier.Operation.ADD_VALUE, expression);
   }
 
   public AttributeModifier createModifier(double base, int storedLevel) {
@@ -49,6 +49,6 @@ public final class AttributeBonus {
       }
       amount = target - base;
     }
-    return new AttributeModifier(MODIFIER_ID, "AutoLeveling", amount, operation);
+    return new AttributeModifier(MODIFIER_ID, amount, operation);
   }
 }

@@ -113,7 +113,7 @@ public final class AdvancedConfig {
           AttributeBonus bonus =
               value.isJsonPrimitive() && value.getAsJsonPrimitive().isNumber()
                   ? AttributeBonus.numeric(
-                      value.getAsDouble(), AttributeModifier.Operation.MULTIPLY_BASE)
+                      value.getAsDouble(), AttributeModifier.Operation.ADD_MULTIPLIED_BASE)
                   : AttributeBonus.expression(value.getAsString());
           bonuses.put(attribute, bonus);
         });

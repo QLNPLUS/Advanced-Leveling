@@ -63,7 +63,7 @@ public interface LevelingSettings {
     }
     double amount = jsonObject.get("amount").getAsDouble();
     AttributeModifier.Operation operation =
-        AttributeModifier.Operation.fromValue(jsonObject.get("operation").getAsInt());
+        AttributeModifier.Operation.BY_ID.apply(jsonObject.get("operation").getAsInt());
     return AttributeBonus.numeric(amount, operation);
   }
 

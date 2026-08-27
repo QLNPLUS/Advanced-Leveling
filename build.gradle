@@ -10,7 +10,14 @@ group = mod_group_id
 base { archivesName = "${mod_file_name}-${minecraft_version}" }
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 sourceSets.main.resources { srcDir 'src/generated/resources' }
-sourceSets.main.java.setSrcDirs(['src/neoforge/java'])
+// The NeoForge 1.21.1 implementation lives in src/main/java. Compile the
+// complete implementation so entity events, config reloaders, saved data and
+// KubeJS-facing APIs are included in the NeoForge artifact.
+sourceSets.main.java.setSrcDirs(['src/main/java'])
+// NeoForge 1.21.1 replaced the legacy SimpleChannel API. The old optional
+// packet shim was never used by the leveling logic and is excluded until a
+// payload-based client sync is needed.
+sourceSets.main.java.exclude('daripher/autoleveling/network/**')
 
 repositories { maven { url = 'https://api.modrinth.com/maven' } }
 

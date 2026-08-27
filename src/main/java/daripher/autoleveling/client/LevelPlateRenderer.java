@@ -13,6 +13,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.ClientHooks;
 import net.neoforged.neoforge.client.event.RenderNameTagEvent;
+import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.bus.api.Event;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
@@ -45,7 +46,7 @@ public class LevelPlateRenderer {
       textY -= 10;
     }
     renderLevel(level, textX, textY, pose, buffer, mode, light);
-    event.setResult(Event.Result.ALLOW);
+    event.setCanRender(TriState.TRUE);
     event.getPoseStack().popPose();
   }
 
@@ -60,7 +61,7 @@ public class LevelPlateRenderer {
     if (!MobsLevelingEvents.shouldShowName(entity)) return false;
     Minecraft minecraft = Minecraft.getInstance();
     double distance = minecraft.getEntityRenderDispatcher().distanceToSqr(entity);
-    return ForgeHooksClient.isNameplateInRenderDistance(entity, distance);
+    return ClientHooks.isNameplateInRenderDistance(entity, distance);
   }
 
   public static void renderLevel(

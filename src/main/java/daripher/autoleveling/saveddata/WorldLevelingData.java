@@ -4,16 +4,17 @@ import daripher.autoleveling.AutoLevelingMod;
 import daripher.autoleveling.data.DimensionsLevelingSettingsReloader;
 import daripher.autoleveling.settings.LevelingSettings;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.core.HolderLookup;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.saveddata.SavedData;
-import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.tick.LevelTickEvent;
 import org.jetbrains.annotations.NotNull;
 
-@Mod.EventBusSubscriber(modid = AutoLevelingMod.MOD_ID)
+@EventBusSubscriber(modid = AutoLevelingMod.MOD_ID)
 public class WorldLevelingData extends SavedData {
   private float levelBonus;
   public int tickCount;
@@ -23,14 +24,14 @@ public class WorldLevelingData extends SavedData {
   }
 
   @SubscribeEvent
-  public static void tick(TickEvent.LevelTickEvent event) {
-    if (event.phase != TickEvent.Phase.START) return;
-    if (event.level.isClientSide) return;
-    WorldLevelingData levelingData = WorldLevelingData.get((ServerLevel) event.level);
-    levelingData.tick(event.level);
+  public static void tick(LevelTickEvent.Pre event) {
+    if (event.getLevel().isClientSide()) return;
+    ServerLevel level = (ServerLevel) event.getLevel();
+    WorldLevelingData levelingData = WorldLevelingData.get(level);
+    levelingData.tick(level);
   }
 
-  private static WorldLevelingData load(CompoundTag tag) {
+  private static WorldLevelingData load(CompoundTag tag, HolderLookup.Provider registries) {
     WorldLevelingData data = WorldLevelingData.create();
     data.levelBonus = tag.getFloat("LevelBonus");
     data.tickCount = tag.getInt("TickCount");
@@ -40,7 +41,9 @@ public class WorldLevelingData extends SavedData {
   public static WorldLevelingData get(ServerLevel level) {
     return level
         .getDataStorage()
-        .computeIfAbsent(WorldLevelingData::load, WorldLevelingData::create, "world_leveling");
+        .computeIfAbsent(
+            new SavedData.Factory<>(WorldLevelingData::create, WorldLevelingData::load),
+            "world_leveling");
   }
 
   private void tick(Level world) {
@@ -57,7 +60,7 @@ public class WorldLevelingData extends SavedData {
   }
 
   @Override
-  public @NotNull CompoundTag save(CompoundTag tag) {
+  public @NotNull CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
     tag.putFloat("LevelBonus", levelBonus);
     tag.putInt("TickCount", tickCount);
     return tag;

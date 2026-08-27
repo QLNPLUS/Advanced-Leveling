@@ -37,8 +37,8 @@ public class AutoLevelingMod {
         .getTypes()
         .forEach(
             entityType -> {
-              event.add(entityType, AutoLevelingAttributes.PROJECTILE_DAMAGE_MULTIPLIER.get());
-              event.add(entityType, AutoLevelingAttributes.EXPLOSION_DAMAGE_MULTIPLIER.get());
+              event.add(entityType, AutoLevelingAttributes.PROJECTILE_DAMAGE_MULTIPLIER);
+              event.add(entityType, AutoLevelingAttributes.EXPLOSION_DAMAGE_MULTIPLIER);
             });
   }
 }

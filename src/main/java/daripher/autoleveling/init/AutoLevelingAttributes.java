@@ -9,7 +9,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 
 public class AutoLevelingAttributes {
   public static final DeferredRegister<Attribute> REGISTRY =
-      DeferredRegister.create(BuiltInRegistries.ATTRIBUTES, AutoLevelingMod.MOD_ID);
+      DeferredRegister.create(BuiltInRegistries.ATTRIBUTE, AutoLevelingMod.MOD_ID);
 
   public static final DeferredHolder<Attribute, Attribute> PROJECTILE_DAMAGE_MULTIPLIER =
       rangedAttribute("monster", "projectile_damage_bonus", 1, 1, 1000);

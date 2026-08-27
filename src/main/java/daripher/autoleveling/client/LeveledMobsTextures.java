@@ -77,7 +77,7 @@ public enum LeveledMobsTextures implements ResourceManagerReloadListener {
     String[] splitTextureName = textureName.split("_");
     String entityTypeName = splitTextureName[0];
     ResourceLocation entityTypeId =
-        ResourceLocation.parse(textureLocation.getNamespace(), entityTypeName);
+        ResourceLocation.fromNamespaceAndPath(textureLocation.getNamespace(), entityTypeName);
     EntityType<?> entityType = BuiltInRegistries.ENTITY_TYPE.get(entityTypeId);
     if (entityType == null) {
       LOGGER.warn(

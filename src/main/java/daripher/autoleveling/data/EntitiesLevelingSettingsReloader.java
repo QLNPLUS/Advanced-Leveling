@@ -1,6 +1,7 @@
 package daripher.autoleveling.data;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.logging.LogUtils;
@@ -13,14 +14,13 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.level.storage.loot.Deserializers;
 import net.minecraft.core.registries.BuiltInRegistries;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 
 public class EntitiesLevelingSettingsReloader extends SimpleJsonResourceReloadListener {
   private static final Logger LOGGER = LogUtils.getLogger();
-  private static final Gson GSON = Deserializers.createLootTableSerializer().create();
+  private static final Gson GSON = new GsonBuilder().create();
   private static final Map<ResourceLocation, EntityLevelingSettings> SETTINGS = new HashMap<>();
 
   public EntitiesLevelingSettingsReloader() {
@@ -29,7 +29,7 @@ public class EntitiesLevelingSettingsReloader extends SimpleJsonResourceReloadLi
 
   @Nullable
   public static EntityLevelingSettings get(EntityType<?> entityType) {
-    return SETTINGS.get(BuiltInRegistries.ENTITY_TYPES.getKey(entityType));
+    return SETTINGS.get(BuiltInRegistries.ENTITY_TYPE.getKey(entityType));
   }
 
   @Override

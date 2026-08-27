@@ -9,7 +9,7 @@ import net.neoforged.neoforge.registries.DeferredHolder;
 
 public class AutoLevelingItems {
   public static final DeferredRegister<Item> REGISTRY =
-      DeferredRegister.create(BuiltInRegistries.ITEMS, AutoLevelingMod.MOD_ID);
+      DeferredRegister.create(BuiltInRegistries.ITEM, AutoLevelingMod.MOD_ID);
 
   public static final DeferredHolder<Item, Item> BLACKLIST_TOOL =
       REGISTRY.register("blacklist_tool", BlacklistToolItem::new);

@@ -41,6 +41,8 @@ public class Config {
     public final ConfigValue<Double> levelPowerPerDeepness;
     public final ConfigValue<Boolean> alwaysShowLevel;
     public final ConfigValue<Boolean> showLevelWhenLookingAt;
+    public final ConfigValue<Integer> levelBonus;
+    public final ConfigValue<Boolean> enableAdditionalLoot;
 
     public Common(ModConfigSpec.Builder builder) {
       builder.push("Mobs");
@@ -48,8 +50,13 @@ public class Config {
       showLevelWhenLookingAt = builder.define("Only show levels when you look at the mob", true);
       expBonus = builder.define("Bonus experience per level", 0.1D);
       builder.pop();
+      // Keep the stable keys used by the NeoForge 1.21.1 configuration.
+      builder.push("Leveling");
+      startingLevel = builder.defineInRange("starting_level", 1, 0, 100000);
+      levelBonus = builder.defineInRange("level_bonus", 0, -100000, 100000);
+      enableAdditionalLoot = builder.define("enable_additional_loot", true);
+      builder.pop();
       builder.push("Default levelling settings");
-      startingLevel = builder.define("Starting level", 1);
       builder.comment("If this is equal to 0, there will be no maximum level");
       maxLevel = builder.define("Maximum level", 0);
       levelsPerDistance = builder.define("Level increase per one block distance from spawn", 0.01D);

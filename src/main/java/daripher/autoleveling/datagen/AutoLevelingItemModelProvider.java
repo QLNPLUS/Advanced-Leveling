@@ -23,7 +23,7 @@ public class AutoLevelingItemModelProvider extends ItemModelProvider {
   }
 
   private void handheld(Item item) {
-    ResourceLocation itemId = Objects.requireNonNull(BuiltInRegistries.ITEMS.getKey(item));
+    ResourceLocation itemId = Objects.requireNonNull(BuiltInRegistries.ITEM.getKey(item));
     withExistingParent(itemId.toString(), mcLoc("handheld"))
         .texture("layer0", modLoc("item/" + itemId.getPath()));
   }
