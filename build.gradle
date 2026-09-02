@@ -7,7 +7,7 @@ plugins {
 
 version = mod_version
 group = mod_group_id
-base { archivesName = "${mod_file_name}-${minecraft_version}" }
+base { archivesName = "${mod_file_name}-neoforge-${minecraft_version}" }
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 // The NeoForge 1.21.1 implementation lives in src/main/java. Compile the
