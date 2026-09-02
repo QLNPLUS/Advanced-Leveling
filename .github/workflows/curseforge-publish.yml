@@ -49,7 +49,7 @@ jobs:
           ./gradlew build --no-daemon
       - name: Verify artifact
         run: |
-          expected="AdvancedLeveling-1.21.1-${CURSEFORGE_VERSION}.jar"
+          expected="advanced-leveling-fabric-1.21.1-${CURSEFORGE_VERSION}.jar"
           test -f "build/libs/$expected"
           echo "CURSEFORGE_FILE=build/libs/$expected" >> "$GITHUB_ENV"
       - name: Prepare current changelog
@@ -72,7 +72,7 @@ jobs:
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
           files: ${{ env.CURSEFORGE_FILE }}
           version: ${{ env.CURSEFORGE_VERSION }}
-          name: AdvancedLeveling-1.21.1-${{ env.CURSEFORGE_VERSION }}
+          name: advanced-leveling-fabric-1.21.1-${{ env.CURSEFORGE_VERSION }}
           version-type: release
           changelog-file: build/curseforge-changelog.md
           loaders: fabric
