@@ -54,7 +54,7 @@ jobs:
 
       - name: Verify artifact
         run: |
-          expected="AdvancedLeveling-1.19.2-${CURSEFORGE_VERSION}-all.jar"
+          expected="advanced-leveling-forge-1.19.2-${CURSEFORGE_VERSION}-all.jar"
           test -f "build/libs/$expected"
           echo "CURSEFORGE_FILE=build/libs/$expected" >> "$GITHUB_ENV"
 
@@ -79,7 +79,7 @@ jobs:
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
           files: ${{ env.CURSEFORGE_FILE }}
           version: ${{ env.CURSEFORGE_VERSION }}
-          name: AdvancedLeveling-1.19.2-${{ env.CURSEFORGE_VERSION }}
+          name: advanced-leveling-forge-1.19.2-${{ env.CURSEFORGE_VERSION }}-all
           version-type: release
           changelog-file: build/curseforge-changelog.md
           loaders: forge
