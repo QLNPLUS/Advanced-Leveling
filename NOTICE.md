@@ -19,11 +19,11 @@ for this fork. These changes are distributed under GNU AGPLv3 together with the 
 
 ## YiRanExpressionLib
 
-The distributable `-all.jar` embeds YiRanExpressionLib by yiran1457. Its embedded mod
-metadata declares GNU AGPLv3. Its source is available from the upstream
+The distributable JAR embeds YiRanExpressionLib by yiran1457. Its embedded mod
+metadata declares GNU Lesser General Public License v3.0. Its source is available from the upstream
 YiRanExpressionLib project associated with the Maven coordinate and repository:
 
-`com.github.yiran1457:YiRanExpressionLib:1.0.0-universal`
+`com.github.yiran1457:YiRanExpressionLib:1.0.1`
 
 https://github.com/yiran1457/YiRanExpressionLib
 
