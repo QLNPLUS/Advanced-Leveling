@@ -1,10 +1,21 @@
+buildscript {
+    repositories {
+        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
+    }
+}
+
 plugins {
     id 'eclipse'
     id 'idea'
     id 'maven-publish'
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
-    id 'org.spongepowered.mixin' version '0.7.+'
 }
+
+apply plugin: 'org.spongepowered.mixin'
 
 version = mod_version
 group = mod_group_id
@@ -147,7 +158,7 @@ jarJar.enable()
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
-    if (file('libs/maven/com/github/yiran1457/YiRanExpressionLib/1.0.0-universal/YiRanExpressionLib-1.0.0-universal.jar').exists()) {
+    if (file('libs/maven/com/github/yiran1457/YiRanExpressionLib/1.0.1/YiRanExpressionLib-1.0.1.jar').exists()) {
         maven { url layout.projectDirectory.dir('libs/maven') }
     }
     maven { url 'https://jitpack.io' }
@@ -162,10 +173,10 @@ repositories {
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
-    def expressionLib = implementation("com.github.yiran1457:YiRanExpressionLib:1.0.0-universal")
+    def expressionLib = implementation("com.github.yiran1457:YiRanExpressionLib:1.0.1")
     jarJar(expressionLib)
-    jarJar.ranged(expressionLib, '[1.0.0,1.0.0]')
-    jarJar.pin(expressionLib, '1.0.0-universal')
+    jarJar.ranged(expressionLib, '[1.0.1,1.0.1]')
+    jarJar.pin(expressionLib, '1.0.1')
     // jade
 	implementation fg.deobf("curse.maven:jade-324717:4573194")
     // neat
@@ -240,4 +251,10 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+tasks.named('jarJar') {
+    from(rootProject.file('licenses/YiRanExpressionLib-LICENSE.txt')) {
+        into 'META-INF/licenses/yiran-expression-lib'
+    }
 }
