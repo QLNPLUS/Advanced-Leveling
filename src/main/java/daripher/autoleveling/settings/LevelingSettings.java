@@ -5,7 +5,7 @@ import com.google.gson.JsonObject;
 import daripher.autoleveling.config.Config;
 import java.util.*;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.neoforged.neoforge.common.ModConfigSpec;
@@ -49,8 +49,8 @@ public interface LevelingSettings {
   }
 
   static Attribute readAttribute(JsonObject jsonObject) {
-    ResourceLocation attributeId = ResourceLocation.parse(jsonObject.get("attribute").getAsString());
-    return BuiltInRegistries.ATTRIBUTE.get(attributeId);
+    Identifier attributeId = Identifier.parse(jsonObject.get("attribute").getAsString());
+    return BuiltInRegistries.ATTRIBUTE.getValue(attributeId);
   }
 
   static AttributeBonus readAttributeModifier(JsonObject jsonObject) {

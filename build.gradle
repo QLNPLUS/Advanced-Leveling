@@ -1,38 +1,43 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
-    id 'net.neoforged.moddev' version '2.0.144'
+    id 'net.neoforged.moddev' version '2.0.140'
     id 'idea'
 }
+
+def targetProperties = new Properties()
+file('gradle.properties').withInputStream { targetProperties.load(it) }
+targetProperties.each { propertyName, propertyValue -> project.ext.set(propertyName, propertyValue) }
 
 version = mod_version
 group = mod_group_id
 base { archivesName = "${mod_file_name}-${minecraft_version}" }
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
-sourceSets.main.resources { srcDir 'src/generated/resources' }
-// The NeoForge 1.21.1 implementation lives in src/main/java. Compile the
-// complete implementation so entity events, config reloaders, saved data and
-// KubeJS-facing APIs are included in the NeoForge artifact.
-sourceSets.main.java.setSrcDirs(['src/main/java'])
-// NeoForge 1.21.1 replaced the legacy SimpleChannel API. The old optional
-// packet shim was never used by the leveling logic and is excluded until a
-// payload-based client sync is needed.
-sourceSets.main.java.exclude('daripher/autoleveling/network/**')
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
-repositories { maven { url = 'https://api.modrinth.com/maven' } }
-
-repositories { maven { url 'https://jitpack.io' } }
+repositories {
+    maven { url = layout.projectDirectory.dir('libs/maven') }
+    maven { url = 'https://jitpack.io' }
+}
 
 neoForge {
-    version = neo_version
-    parchment {
-        mappingsVersion = parchment_mappings_version
-        minecraftVersion = parchment_minecraft_version
+    enable {
+        version = neo_version
+        disableRecompilation = true
     }
     runs {
-        client { client(); systemProperty 'neoforge.enabledGameTestNamespaces', mod_id }
-        server { server(); programArgument '--nogui'; systemProperty 'neoforge.enabledGameTestNamespaces', mod_id }
-        gameTestServer { type = 'gameTestServer'; systemProperty 'neoforge.enabledGameTestNamespaces', mod_id }
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
+        }
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
+        }
+        gameTestServer {
+            type = 'gameTestServer'
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
+        }
         data {
             data()
             programArguments.addAll '--mod', mod_id, '--all', '--output', file('src/generated/resources/').absolutePath, '--existing', file('src/main/resources/').absolutePath
@@ -42,22 +47,49 @@ neoForge {
             logLevel = org.slf4j.event.Level.DEBUG
         }
     }
-    mods { "${mod_id}" { sourceSet sourceSets.main } }
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+    }
 }
 
-configurations { runtimeClasspath.extendsFrom localRuntime }
+sourceSets.main.java.srcDir 'src/main/java'
+sourceSets.main.resources.srcDir 'src/generated/resources'
+sourceSets.main.java.exclude('daripher/autoleveling/network/**')
+sourceSets.main.java.exclude('daripher/autoleveling/mixin/client/**')
+sourceSets.main.java.exclude('daripher/autoleveling/client/LevelPlateRenderer.java')
+sourceSets.main.java.exclude('daripher/autoleveling/integration/jade/**')
+sourceSets.main.java.exclude('daripher/autoleveling/datagen/**')
+
+configurations {
+    runtimeClasspath.extendsFrom localRuntime
+}
 
 dependencies {
-    def expressionLib = implementation('com.github.yiran1457:YiRanExpressionLib:1.21.1-NeoForge-1.0.0')
-    jarJar(expressionLib)
+    def expressionLib = implementation('com.github.yiran1457:YiRanExpressionLib:1.0.1')
+    jarJar(expressionLib) {
+        version {
+            strictly '[1.0.1]'
+            prefer '1.0.1'
+        }
+    }
     compileOnly(files('libs/Jade-1.21.1-NeoForge-15.10.6.jar'))
 }
 
 def generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
-    def replaceProperties = [minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
-            neo_version: neo_version, loader_version_range: loader_version_range,
-            mod_id: mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
-            mod_authors: mod_authors, mod_description: mod_description]
+    def replaceProperties = [
+            minecraft_version: minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version: neo_version,
+            loader_version_range: loader_version_range,
+            mod_id: mod_id,
+            mod_name: mod_name,
+            mod_license: mod_license,
+            mod_version: mod_version,
+            mod_authors: mod_authors,
+            mod_description: mod_description,
+    ]
     inputs.properties replaceProperties
     expand replaceProperties
     from 'src/main/templates'
@@ -68,8 +100,28 @@ sourceSets.main.resources.srcDir generateModMetadata
 neoForge.ideSyncTask generateModMetadata
 
 publishing {
-    publications { register('mavenJava', MavenPublication) { from components.java } }
-    repositories { maven { url "file://${project.projectDir}/mcmodsrepo" } }
+    publications {
+        register('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven { url "file://${project.projectDir}/mcmodsrepo" }
+    }
 }
 
-tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('jar', Jar).configure {
+    from(rootProject.file('LICENSE')) {
+        into 'META-INF/licenses/advanced-armor-damage-limit'
+    }
+    from(rootProject.file('NOTICE.md')) {
+        into 'META-INF'
+    }
+    from(rootProject.file('licenses/YiRanExpressionLib-LICENSE.txt')) {
+        into 'META-INF/licenses/yiran-expression-lib'
+    }
+}

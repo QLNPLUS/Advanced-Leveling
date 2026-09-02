@@ -6,7 +6,6 @@ import daripher.autoleveling.config.Config;
 import daripher.autoleveling.data.DimensionsLevelingSettingsReloader;
 import daripher.autoleveling.data.EntitiesLevelingSettingsReloader;
 import daripher.autoleveling.init.AutoLevelingAttributes;
-import daripher.autoleveling.mixin.LivingEntityAccessor;
 import daripher.autoleveling.saveddata.GlobalLevelingData;
 import daripher.autoleveling.saveddata.WorldLevelingData;
 import daripher.autoleveling.settings.DimensionLevelingSettings;
@@ -16,13 +15,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nonnull;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.context.ContextKeySet;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -40,12 +38,9 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.LootTable;
-import net.minecraft.world.level.storage.loot.parameters.LootContextParamSet;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.neoforge.event.AddReloadListenerEvent;
+import net.neoforged.neoforge.event.AddServerReloadListenersEvent;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingExperienceDropEvent;
@@ -58,8 +53,8 @@ import net.neoforged.fml.common.EventBusSubscriber;
 @EventBusSubscriber(modid = AutoLevelingMod.MOD_ID)
 public class MobsLevelingEvents {
   private static final String LEVEL_TAG = "LEVEL";
-  private static final LootContextParamSet ADDITIONAL_LOOT_PARAMS =
-      new LootContextParamSet.Builder()
+  private static final ContextKeySet ADDITIONAL_LOOT_PARAMS =
+      new ContextKeySet.Builder()
           .required(LootContextParams.THIS_ENTITY)
           .required(LootContextParams.ORIGIN)
           .required(LootContextParams.DAMAGE_SOURCE)
@@ -88,7 +83,7 @@ public class MobsLevelingEvents {
     ResourceKey<Level> dimension = entity.level().dimension();
     DimensionLevelingSettings settings = DimensionsLevelingSettingsReloader.get(dimension);
     if (settings.spawnPosOverride() == null) {
-      return entity.level().getSharedSpawnPos();
+      return ((ServerLevel) entity.level()).getRespawnData().pos();
     }
     return settings.spawnPosOverride();
   }
@@ -110,20 +105,26 @@ public class MobsLevelingEvents {
     ResourceKey<LootTable> lootTableId =
         ResourceKey.create(
             net.minecraft.core.registries.Registries.LOOT_TABLE,
-            ResourceLocation.fromNamespaceAndPath(AutoLevelingMod.MOD_ID, "gameplay/leveled_mobs"));
+            Identifier.fromNamespaceAndPath(AutoLevelingMod.MOD_ID, "gameplay/leveled_mobs"));
     MinecraftServer server = entity.level().getServer();
     if (server == null) return;
     LootTable lootTable = server.reloadableRegistries().getLootTable(lootTableId);
     if (lootTable == LootTable.EMPTY) return;
     LootParams lootParams = createLootParams(entity, event.getSource());
-    lootTable.getRandomItems(lootParams, entity::spawnAtLocation);
+    lootTable.getRandomItems(
+        lootParams,
+        itemStack -> entity.spawnAtLocation((ServerLevel) entity.level(), itemStack));
   }
 
   @SubscribeEvent
-  public static void reloadSettings(AddReloadListenerEvent event) {
+  public static void reloadSettings(AddServerReloadListenersEvent event) {
     AdvancedConfig.load();
-    event.addListener(new DimensionsLevelingSettingsReloader());
-    event.addListener(new EntitiesLevelingSettingsReloader());
+    event.addListener(
+        Identifier.fromNamespaceAndPath(AutoLevelingMod.MOD_ID, "dimensions_leveling_settings"),
+        new DimensionsLevelingSettingsReloader());
+    event.addListener(
+        Identifier.fromNamespaceAndPath(AutoLevelingMod.MOD_ID, "entities_leveling_settings"),
+        new EntitiesLevelingSettingsReloader());
   }
 
   @SubscribeEvent
@@ -150,28 +151,13 @@ public class MobsLevelingEvents {
     return instance == null ? 0F : (float) instance.getValue();
   }
 
-  @OnlyIn(Dist.CLIENT)
-  public static boolean shouldShowName(LivingEntity entity) {
-    if (!Minecraft.renderNames()) return false;
-    if (entity.isVehicle()) return false;
-    Minecraft minecraft = Minecraft.getInstance();
-    if (entity == minecraft.getCameraEntity()) return false;
-    LocalPlayer clientPlayer = minecraft.player;
-    if (clientPlayer == null) return false;
-    if (!clientPlayer.hasLineOfSight(entity) || entity.isInvisibleTo(clientPlayer)) return false;
-    if (!hasLevel(entity)) return false;
-    if (!shouldShowLevel(entity)) return false;
-    if (Config.COMMON.alwaysShowLevel.get()) return true;
-    return Config.COMMON.showLevelWhenLookingAt.get() && minecraft.crosshairPickEntity == entity;
-  }
-
   private static boolean shouldSetLevel(Entity entity) {
-    if (entity.level().isClientSide) return false;
+    if (entity.level().isClientSide()) return false;
     return canHaveLevel(entity);
   }
 
   private static int createLevelForEntity(LivingEntity entity, double distance) {
-    MinecraftServer server = entity.getServer();
+    MinecraftServer server = ((ServerLevel) entity.level()).getServer();
     if (server == null) return 0;
     LevelingSettings settings = getLevelingSettings(entity);
     int monsterLevel = settings.startingLevel() - 1;
@@ -252,22 +238,21 @@ public class MobsLevelingEvents {
 
   private static LootTable getEquipmentLootTableForSlot(
       MinecraftServer server, LivingEntity entity, EquipmentSlot slot) {
-    ResourceLocation entityId = EntityType.getKey(entity.getType());
-    ResourceLocation lootTableId = getEquipmentTableId(slot, entityId);
+    Identifier entityId = EntityType.getKey(entity.getType());
+    Identifier lootTableId = getEquipmentTableId(slot, entityId);
     ResourceKey<LootTable> key =
         ResourceKey.create(Registries.LOOT_TABLE, lootTableId);
     return server.reloadableRegistries().getLootTable(key);
   }
 
   @Nonnull
-  private static ResourceLocation getEquipmentTableId(
-      EquipmentSlot slot, ResourceLocation entityId) {
+  private static Identifier getEquipmentTableId(
+      EquipmentSlot slot, Identifier entityId) {
     String path = "equipment/" + entityId.getPath() + "_" + slot.getName();
-    return ResourceLocation.fromNamespaceAndPath(entityId.getNamespace(), path);
+    return Identifier.fromNamespaceAndPath(entityId.getNamespace(), path);
   }
 
   private static LootParams createLootParams(LivingEntity entity, DamageSource damageSource) {
-    LivingEntityAccessor accessor = (LivingEntityAccessor) entity;
     ServerLevel level = (ServerLevel) entity.level();
     LootParams.Builder builder =
         new LootParams.Builder(level)
@@ -277,8 +262,8 @@ public class MobsLevelingEvents {
             .withOptionalParameter(LootContextParams.ATTACKING_ENTITY, damageSource.getEntity())
             .withOptionalParameter(
                 LootContextParams.DIRECT_ATTACKING_ENTITY, damageSource.getDirectEntity());
-    int lastHurtByPlayerTime = accessor.getLastHurtByPlayerTime();
-    Player lastHurtByPlayer = accessor.getLastHurtByPlayer();
+    int lastHurtByPlayerTime = entity.getLastHurtByPlayerMemoryTime();
+    Player lastHurtByPlayer = entity.getLastHurtByPlayer();
     if (lastHurtByPlayerTime > 0 && lastHurtByPlayer != null) {
       builder =
           builder
@@ -298,7 +283,7 @@ public class MobsLevelingEvents {
   private static boolean canHaveLevel(Entity entity) {
     if (!(entity instanceof LivingEntity)) return false;
     if (entity.getType() == EntityType.PLAYER) return false;
-    ResourceLocation entityId = EntityType.getKey(entity.getType());
+    Identifier entityId = EntityType.getKey(entity.getType());
     String entityNamespace = entityId.getNamespace();
     List<String> blacklist = AdvancedConfig.getMobBlacklist();
     if (blacklist.contains(entityNamespace + ":*")) return false;
@@ -310,7 +295,7 @@ public class MobsLevelingEvents {
   }
 
   public static boolean shouldShowLevel(Entity entity) {
-    ResourceLocation entityId = EntityType.getKey(entity.getType());
+    Identifier entityId = EntityType.getKey(entity.getType());
     List<String> blacklist = AdvancedConfig.getHiddenLevels();
     if (blacklist.contains(entityId.toString())) return false;
     String namespace = entityId.getNamespace();
@@ -322,7 +307,7 @@ public class MobsLevelingEvents {
   }
 
   public static int getLevel(LivingEntity entity) {
-    return entity.getPersistentData().getInt(LEVEL_TAG);
+    return entity.getPersistentData().getIntOr(LEVEL_TAG, 0);
   }
 
   public static void setLevel(LivingEntity entity, int level) {

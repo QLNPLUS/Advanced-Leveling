@@ -19,7 +19,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.neoforged.fml.loading.FMLPaths;
@@ -105,7 +105,7 @@ public final class AdvancedConfig {
     Map<Attribute, AttributeBonus> bonuses = new LinkedHashMap<>();
     configuredAttributes.forEach(
         (attributeId, value) -> {
-          Attribute attribute = BuiltInRegistries.ATTRIBUTE.get(ResourceLocation.parse(attributeId));
+          Attribute attribute = BuiltInRegistries.ATTRIBUTE.getValue(Identifier.parse(attributeId));
           if (attribute == null) {
             AutoLevelingMod.LOGGER.error("Attribute '{}' could not be found", attributeId);
             return;
@@ -158,7 +158,7 @@ public final class AdvancedConfig {
         .forEach(
             entry -> {
               String id = entry.getKey();
-              ResourceLocation.parse(id);
+              Identifier.parse(id);
               JsonElement value = entry.getValue();
               boolean number = value.isJsonPrimitive() && value.getAsJsonPrimitive().isNumber();
               boolean expression = value.isJsonPrimitive() && value.getAsJsonPrimitive().isString();

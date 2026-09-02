@@ -9,6 +9,8 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.permissions.Permission;
+import net.minecraft.server.permissions.PermissionLevel;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -57,6 +59,8 @@ public class AutoLevelingCommands {
   }
 
   private static boolean hasPermission(CommandSourceStack commandSourceStack) {
-    return commandSourceStack.hasPermission(2);
+    return commandSourceStack
+        .permissions()
+        .hasPermission(new Permission.HasCommandLevel(PermissionLevel.GAMEMASTERS));
   }
 }

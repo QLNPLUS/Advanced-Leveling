@@ -2,7 +2,7 @@ package daripher.autoleveling.integration.jade;
 
 import daripher.autoleveling.AutoLevelingMod;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import snownee.jade.api.EntityAccessor;
 import snownee.jade.api.IEntityComponentProvider;
 import snownee.jade.api.ITooltip;
@@ -11,10 +11,10 @@ import snownee.jade.api.config.IPluginConfig;
 public enum LevelComponentProvider implements IEntityComponentProvider {
   INSTANCE;
 
-  private static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(AutoLevelingMod.MOD_ID, "level");
+  private static final Identifier ID = Identifier.fromNamespaceAndPath(AutoLevelingMod.MOD_ID, "level");
 
   @Override
-  public ResourceLocation getUid() {
+  public Identifier getUid() {
     return ID;
   }
 

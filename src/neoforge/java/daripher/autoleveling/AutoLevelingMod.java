@@ -5,7 +5,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
@@ -28,9 +28,9 @@ import org.slf4j.Logger;
 public final class AutoLevelingMod {
   public static final String MOD_ID = "autoleveling";
   public static final Logger LOGGER = LogUtils.getLogger();
-  private static final ResourceLocation LEVEL_MODIFIER = ResourceLocation.fromNamespaceAndPath(MOD_ID, "level");
+  private static final Identifier LEVEL_MODIFIER = Identifier.fromNamespaceAndPath(MOD_ID, "level");
   private static final ResourceKey<LootTable> ADDITIONAL_LOOT = ResourceKey.create(Registries.LOOT_TABLE,
-      ResourceLocation.fromNamespaceAndPath(MOD_ID, "gameplay/leveled_mobs"));
+      Identifier.fromNamespaceAndPath(MOD_ID, "gameplay/leveled_mobs"));
   public static final ModConfigSpec COMMON_SPEC;
   public static final ModConfigSpec.BooleanValue ENABLE_ADDITIONAL_LOOT;
   public static final ModConfigSpec.IntValue STARTING_LEVEL;

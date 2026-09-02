@@ -12,11 +12,10 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.fml.common.EventBusSubscriber.Bus;
 import net.neoforged.fml.ModContainer;
 import org.slf4j.Logger;
 
-@EventBusSubscriber(bus = Bus.MOD)
+@EventBusSubscriber
 @Mod(AutoLevelingMod.MOD_ID)
 public class AutoLevelingMod {
   public static final Logger LOGGER = LogUtils.getLogger();

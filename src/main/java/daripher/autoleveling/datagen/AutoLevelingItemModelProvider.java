@@ -4,7 +4,7 @@ import daripher.autoleveling.AutoLevelingMod;
 import daripher.autoleveling.init.AutoLevelingItems;
 import java.util.Objects;
 import net.minecraft.data.PackOutput;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.client.model.generators.ItemModelProvider;
 import net.neoforged.neoforge.common.data.ExistingFileHelper;
@@ -23,7 +23,7 @@ public class AutoLevelingItemModelProvider extends ItemModelProvider {
   }
 
   private void handheld(Item item) {
-    ResourceLocation itemId = Objects.requireNonNull(BuiltInRegistries.ITEM.getKey(item));
+    Identifier itemId = Objects.requireNonNull(BuiltInRegistries.ITEM.getKey(item));
     withExistingParent(itemId.toString(), mcLoc("handheld"))
         .texture("layer0", modLoc("item/" + itemId.getPath()));
   }

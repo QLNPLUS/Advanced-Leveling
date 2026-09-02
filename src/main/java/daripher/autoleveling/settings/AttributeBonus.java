@@ -2,14 +2,14 @@ package daripher.autoleveling.settings;
 
 import java.util.Map;
 import java.util.Set;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.yiran.expressionlib.expr.Expression;
 import net.yiran.expressionlib.expr.ExpressionBuilder;
 
 public final class AttributeBonus {
-  public static final ResourceLocation MODIFIER_ID =
-      ResourceLocation.fromNamespaceAndPath("autoleveling", "level");
+  public static final Identifier MODIFIER_ID =
+      Identifier.fromNamespaceAndPath("autoleveling", "level");
   private static final Set<String> VARIABLES = Set.of("base", "level");
 
   private final double amountPerLevel;

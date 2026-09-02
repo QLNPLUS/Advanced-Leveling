@@ -1,12 +1,12 @@
 {
   "required": true,
   "minVersion": "0.8",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
   "package": "daripher.autoleveling.mixin",
   "mixins": [],
   "client": [],
   "injectors": {
     "defaultRequire": 1
   },
-  "refmap": null
+  "refmap": "autoleveling.refmap.json"
 }

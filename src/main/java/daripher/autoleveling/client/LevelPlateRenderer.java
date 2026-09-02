@@ -2,7 +2,7 @@ package daripher.autoleveling.client;
 
 import daripher.autoleveling.AutoLevelingMod;
 import daripher.autoleveling.config.Config;
-import daripher.autoleveling.event.MobsLevelingEvents;
+import daripher.autoleveling.client.ClientNameplateHelper;
 import javax.annotation.Nonnull;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -13,7 +13,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.client.ClientHooks;
 import net.neoforged.neoforge.client.event.RenderNameTagEvent;
-import net.neoforged.neoforge.common.util.TriState;
+import net.minecraft.util.TriState;
 import net.neoforged.bus.api.Event;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModList;
@@ -58,7 +58,7 @@ public class LevelPlateRenderer {
   private static boolean shouldRender(RenderNameTagEvent event) {
     if (ModList.get().isLoaded("neat")) return false;
     if (!(event.getEntity() instanceof LivingEntity entity)) return false;
-    if (!MobsLevelingEvents.shouldShowName(entity)) return false;
+    if (!ClientNameplateHelper.shouldShowName(entity)) return false;
     Minecraft minecraft = Minecraft.getInstance();
     double distance = minecraft.getEntityRenderDispatcher().distanceToSqr(entity);
     return ClientHooks.isNameplateInRenderDistance(entity, distance);
