@@ -1,8 +1,6 @@
 {
   "pack": {
-    "description": {
-      "text": "${mod_id} resources"
-    },
-    "pack_format": 15
+    "description": "Resources for Advanced Armor Damage Limit",
+    "pack_format": 9
   }
 }

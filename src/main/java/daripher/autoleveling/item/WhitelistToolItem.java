@@ -26,7 +26,7 @@ public class WhitelistToolItem extends Item {
       Player player,
       @NotNull LivingEntity entity,
       @NotNull InteractionHand hand) {
-    if (!player.level().isClientSide) whitelistEntity(player, entity);
+    if (!player.level.isClientSide) whitelistEntity(player, entity);
     return InteractionResult.SUCCESS;
   }
 

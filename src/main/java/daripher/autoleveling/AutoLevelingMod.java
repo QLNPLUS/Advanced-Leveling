@@ -27,7 +27,6 @@ public class AutoLevelingMod {
     AutoLevelingLootItemConditions.REGISTRY.register(modEventBus);
     AutoLevelingItems.REGISTRY.register(modEventBus);
     AutoLevelingAttributes.REGISTRY.register(modEventBus);
-    AutoLevelingTabs.REGISTRY.register(modEventBus);
     AdvancedConfig.load();
     Config.register();
   }

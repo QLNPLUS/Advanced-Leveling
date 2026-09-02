@@ -5,12 +5,9 @@
   "package": "daripher.autoleveling.mixin",
   "mixins": [
     "LivingEntityAccessor",
-    "minecraft/WolfMixin",
-    "neat.HealthBarRendererMixin"
+    "minecraft/WolfMixin"
   ],
-  "client": [
-    "client.LivingEntityRendererMixin"
-  ],
+  "client": [],
   "injectors": {
     "defaultRequire": 1
   },

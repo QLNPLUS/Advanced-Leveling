@@ -26,7 +26,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -38,7 +37,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.LootContext;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSet;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
@@ -86,10 +85,10 @@ public class MobsLevelingEvents {
   }
 
   private static BlockPos getSpawnPosition(LivingEntity entity) {
-    ResourceKey<Level> dimension = entity.level().dimension();
+    ResourceKey<Level> dimension = entity.level.dimension();
     DimensionLevelingSettings settings = DimensionsLevelingSettingsReloader.get(dimension);
     if (settings.spawnPosOverride() == null) {
-      return entity.level().getSharedSpawnPos();
+      return entity.level.getSharedSpawnPos();
     }
     return settings.spawnPosOverride();
   }
@@ -109,11 +108,11 @@ public class MobsLevelingEvents {
     if (!hasLevel(entity)) return;
     ResourceLocation lootTableId =
         new ResourceLocation(AutoLevelingMod.MOD_ID, "gameplay/leveled_mobs");
-    MinecraftServer server = entity.level().getServer();
+    MinecraftServer server = entity.level.getServer();
     if (server == null) return;
-    LootTable lootTable = server.getLootData().getLootTable(lootTableId);
+    LootTable lootTable = server.getLootTables().get(lootTableId);
     if (lootTable == LootTable.EMPTY) return;
-    LootParams lootParams = createLootParams(entity, event.getSource());
+    LootContext lootParams = createLootParams(entity, event.getSource());
     lootTable.getRandomItems(lootParams, entity::spawnAtLocation);
   }
 
@@ -142,10 +141,10 @@ public class MobsLevelingEvents {
   }
 
   public static float getDamageMultiplier(DamageSource damage, LivingEntity attacker) {
-    if (damage.is(DamageTypeTags.IS_PROJECTILE)) {
+    if (damage.isProjectile()) {
       return getAttributeValue(attacker, AutoLevelingAttributes.PROJECTILE_DAMAGE_MULTIPLIER.get());
     }
-    if (damage.is(DamageTypeTags.IS_EXPLOSION)) {
+    if (damage.isExplosion()) {
       return getAttributeValue(attacker, AutoLevelingAttributes.EXPLOSION_DAMAGE_MULTIPLIER.get());
     }
     return 1F;
@@ -172,7 +171,7 @@ public class MobsLevelingEvents {
   }
 
   private static boolean shouldSetLevel(Entity entity) {
-    if (entity.level().isClientSide) return false;
+    if (entity.level.isClientSide) return false;
     return canHaveLevel(entity);
   }
 
@@ -192,7 +191,7 @@ public class MobsLevelingEvents {
     int levelBonus = settings.randomLevelBonus() + 1;
     if (levelBonus > 0) monsterLevel += entity.getRandom().nextInt(levelBonus);
     monsterLevel = Math.abs(monsterLevel);
-    monsterLevel += WorldLevelingData.get((ServerLevel) entity.level()).getLevelBonus();
+    monsterLevel += WorldLevelingData.get((ServerLevel) entity.level).getLevelBonus();
     if (maxLevel > 0) monsterLevel = Math.min(monsterLevel, maxLevel - 1);
     GlobalLevelingData globalLevelingData = GlobalLevelingData.get(server);
     monsterLevel += globalLevelingData.getLevelBonus();
@@ -203,7 +202,7 @@ public class MobsLevelingEvents {
   private static LevelingSettings getLevelingSettings(LivingEntity entity) {
     LevelingSettings settings = EntitiesLevelingSettingsReloader.get(entity.getType());
     if (settings == null) {
-      ResourceKey<Level> dimension = entity.level().dimension();
+      ResourceKey<Level> dimension = entity.level.dimension();
       return DimensionsLevelingSettingsReloader.get(dimension);
     }
     return settings;
@@ -237,12 +236,12 @@ public class MobsLevelingEvents {
   }
 
   public static void addEquipment(LivingEntity entity) {
-    MinecraftServer server = entity.level().getServer();
+    MinecraftServer server = entity.level.getServer();
     if (server == null) return;
     for (EquipmentSlot slot : EquipmentSlot.values()) {
       LootTable equipmentTable = getEquipmentLootTableForSlot(server, entity, slot);
       if (equipmentTable == LootTable.EMPTY) continue;
-      LootParams lootParams = createEquipmentLootParams(entity);
+      LootContext lootParams = createEquipmentLootParams(entity);
       equipmentTable.getRandomItems(lootParams, itemStack -> entity.setItemSlot(slot, itemStack));
     }
   }
@@ -251,7 +250,7 @@ public class MobsLevelingEvents {
       MinecraftServer server, LivingEntity entity, EquipmentSlot slot) {
     ResourceLocation entityId = EntityType.getKey(entity.getType());
     ResourceLocation lootTableId = getEquipmentTableId(slot, entityId);
-    return server.getLootData().getLootTable(lootTableId);
+    return server.getLootTables().get(lootTableId);
   }
 
   @Nonnull
@@ -261,11 +260,11 @@ public class MobsLevelingEvents {
     return new ResourceLocation(entityId.getNamespace(), path);
   }
 
-  private static LootParams createLootParams(LivingEntity entity, DamageSource damageSource) {
+  private static LootContext createLootParams(LivingEntity entity, DamageSource damageSource) {
     LivingEntityAccessor accessor = (LivingEntityAccessor) entity;
-    ServerLevel level = (ServerLevel) entity.level();
-    LootParams.Builder builder =
-        new LootParams.Builder(level)
+    ServerLevel level = (ServerLevel) entity.level;
+    LootContext.Builder builder =
+        new LootContext.Builder(level)
             .withParameter(LootContextParams.THIS_ENTITY, entity)
             .withParameter(LootContextParams.ORIGIN, entity.position())
             .withParameter(LootContextParams.DAMAGE_SOURCE, damageSource)
@@ -283,8 +282,8 @@ public class MobsLevelingEvents {
     return builder.create(ADDITIONAL_LOOT_PARAMS);
   }
 
-  private static LootParams createEquipmentLootParams(LivingEntity entity) {
-    return new LootParams.Builder((ServerLevel) entity.level())
+  private static LootContext createEquipmentLootParams(LivingEntity entity) {
+    return new LootContext.Builder((ServerLevel) entity.level)
         .withParameter(LootContextParams.THIS_ENTITY, entity)
         .withParameter(LootContextParams.ORIGIN, entity.position())
         .create(LootContextParamSets.SELECTOR);

@@ -26,7 +26,7 @@ public class BlacklistToolItem extends Item {
       Player player,
       @NotNull LivingEntity entity,
       @NotNull InteractionHand hand) {
-    if (!player.level().isClientSide) blacklistEntity(player, entity);
+    if (!player.level.isClientSide) blacklistEntity(player, entity);
     return InteractionResult.SUCCESS;
   }
 
