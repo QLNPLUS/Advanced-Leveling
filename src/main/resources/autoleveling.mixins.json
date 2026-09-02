@@ -3,7 +3,9 @@
   "minVersion": "0.8",
   "compatibilityLevel": "JAVA_21",
   "package": "daripher.autoleveling.mixin",
-  "mixins": [],
+  "mixins": [
+    "LivingEntityAccessor"
+  ],
   "client": [],
   "injectors": {
     "defaultRequire": 1

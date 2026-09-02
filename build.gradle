@@ -19,6 +19,8 @@ sourceSets.main.java.setSrcDirs(['src/main/java'])
 // payload-based client sync is needed.
 sourceSets.main.java.exclude('daripher/autoleveling/network/**')
 
+repositories { maven { url = layout.projectDirectory.dir('libs/maven') } }
+
 repositories { maven { url = 'https://api.modrinth.com/maven' } }
 
 repositories { maven { url 'https://jitpack.io' } }
@@ -48,8 +50,13 @@ neoForge {
 configurations { runtimeClasspath.extendsFrom localRuntime }
 
 dependencies {
-    def expressionLib = implementation('com.github.yiran1457:YiRanExpressionLib:1.21.1-NeoForge-1.0.0')
-    jarJar(expressionLib)
+    def expressionLib = implementation('com.github.yiran1457:YiRanExpressionLib:1.0.1')
+    jarJar(expressionLib) {
+        version {
+            strictly '[1.0.1]'
+            prefer '1.0.1'
+        }
+    }
     compileOnly(files('libs/Jade-1.21.1-NeoForge-15.10.6.jar'))
 }
 
@@ -73,3 +80,9 @@ publishing {
 }
 
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+
+tasks.named('jar', Jar).configure {
+    from(rootProject.file('licenses/YiRanExpressionLib-LICENSE.txt')) {
+        into 'META-INF/licenses/yiran-expression-lib'
+    }
+}
