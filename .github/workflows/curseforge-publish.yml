@@ -21,7 +21,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     concurrency:
-      group: curseforge-advanced-leveling-neoforge-1.21.1-${{ env.RELEASE_VERSION }}
+      group: curseforge-advanced-leveling-neoforge-1.21.1-${{ github.ref_name }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
