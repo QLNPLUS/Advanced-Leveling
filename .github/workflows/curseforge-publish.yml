@@ -1,27 +1,28 @@
-name: Publish NeoForge 1.21.1 mod
+name: Build, test and publish NeoForge 1.21.1 mod
 
+# An ordinary push builds and tests only: no publication credentials are available to it, so it
+# cannot upload by accident. Publishing requires either an exact version tag (v<mod_version>) or an
+# explicit `publish` choice on a manual run. The version always comes from gradle.properties.
 on:
   push:
     branches: [neoforge-1.21.1]
+    tags: ['v*']
   workflow_dispatch:
     inputs:
-      version:
-        description: Mod version to publish
+      publish:
+        description: Publish the built jar to CurseForge
         required: true
-        default: 1.0.2
-        type: string
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
-env:
-  RELEASE_VERSION: ${{ inputs.version || '1.0.2' }}
-
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
     concurrency:
-      group: curseforge-advanced-leveling-neoforge-1.21.1-${{ github.ref_name }}
+      group: build-advanced-leveling-neoforge-1.21.1-${{ github.ref_name }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
@@ -31,11 +32,51 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Normalize release version
+      - name: Read mod version
         run: |
-          version="${RELEASE_VERSION#v}"
+          version="$(sed -n 's/^mod_version=//p' gradle.properties | tail -n 1)"
           test -n "$version"
-          echo "CURSEFORGE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "MOD_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Check tag matches mod version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          test "v${MOD_VERSION}" = "${GITHUB_REF_NAME}"
+      - name: Build and test
+        run: |
+          chmod +x gradlew
+          ./gradlew build --no-daemon
+      - name: Verify artifact
+        run: |
+          expected="advanced-leveling-neoforge-1.21.1-${MOD_VERSION}.jar"
+          test -f "build/libs/$expected"
+          echo "MOD_FILE=$expected" >> "$GITHUB_ENV"
+      - name: Store artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: advanced-leveling-neoforge-1.21.1-${{ env.MOD_VERSION }}
+          path: build/libs/${{ env.MOD_FILE }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.publish == true
+    runs-on: ubuntu-latest
+    concurrency:
+      group: curseforge-advanced-leveling-neoforge-1.21.1
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Read mod version
+        run: |
+          version="$(sed -n 's/^mod_version=//p' gradle.properties | tail -n 1)"
+          test -n "$version"
+          echo "MOD_VERSION=$version" >> "$GITHUB_ENV"
+      - name: Check tag matches mod version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          test "v${MOD_VERSION}" = "${GITHUB_REF_NAME}"
       - name: Validate CurseForge configuration
         env:
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
@@ -43,18 +84,20 @@ jobs:
         run: |
           test -n "$CURSEFORGE_PROJECT_ID"
           test -n "$CURSEFORGE_TOKEN"
-      - name: Build mod
-        run: |
-          chmod +x gradlew
-          ./gradlew build --no-daemon
+      - name: Fetch built artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: advanced-leveling-neoforge-1.21.1-${{ env.MOD_VERSION }}
+          path: build/libs
       - name: Verify artifact
         run: |
-          expected="advanced-leveling-neoforge-1.21.1-${CURSEFORGE_VERSION}.jar"
-          test -f "build/libs/$expected"
-          echo "CURSEFORGE_FILE=build/libs/$expected" >> "$GITHUB_ENV"
+          expected="build/libs/advanced-leveling-neoforge-1.21.1-${MOD_VERSION}.jar"
+          test -f "$expected"
+          echo "MOD_FILE=$expected" >> "$GITHUB_ENV"
       - name: Prepare current changelog
         run: |
-          awk -v version="$CURSEFORGE_VERSION" '
+          mkdir -p build
+          awk -v version="$MOD_VERSION" '
             /^##[[:space:]]+/ {
               heading = $2
               gsub(/^\[/, "", heading)
@@ -70,9 +113,9 @@ jobs:
         with:
           curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          files: ${{ env.CURSEFORGE_FILE }}
-          version: ${{ env.CURSEFORGE_VERSION }}
-          name: advanced-leveling-neoforge-1.21.1-${{ env.CURSEFORGE_VERSION }}
+          files: ${{ env.MOD_FILE }}
+          version: ${{ env.MOD_VERSION }}
+          name: advanced-leveling-neoforge-1.21.1-${{ env.MOD_VERSION }}
           version-type: release
           changelog-file: build/curseforge-changelog.md
           loaders: neoforge

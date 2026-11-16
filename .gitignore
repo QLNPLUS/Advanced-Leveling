@@ -23,7 +23,8 @@ build
 eclipse
 run
 
-# Local Maven fallback used when JitPack is unavailable
+# Bundled third-party artifacts. The pinned files below are committed on purpose and are the only
+# allowed source for their coordinates; this entry only keeps local scratch jars out of the tree.
 libs/maven/
 libs/*.jar
 

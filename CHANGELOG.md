@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.3
+
+- Added the read-only, server-safe `daripher.autoleveling.api.LevelingApi` with `displayLevel(LivingEntity)`, so integrations can read the level this mod displays without touching entity data.
+- The bundled YiRanExpressionLib artifact is now the official upstream `universal` build of `1.0.1`, pinned by size and SHA-256, resolved only from `libs/maven` instead of JitPack.
+- Added build gates that reject a missing, edited or differently resolved library artifact and verify the nested library inside the packaged jar.
+- Added JUnit tests for the numeric and expression attribute modes and for every `displayLevel` outcome.
+- Publishing now happens only from an exact version tag or an explicit manual publish choice; an ordinary push builds and tests without publication credentials, and the version is read from `gradle.properties`.
+
 ## 1.0.2
 
 - Added NeoForge 1.21.1 support.
