@@ -1,28 +1,29 @@
-name: Publish Fabric 1.21.1 mod
+name: Build, test and publish Fabric 1.21.1 mod
 
+# A normal push only builds and tests: no publication credentials are available to it. Publishing is
+# an explicit, manual dispatch with `publish` enabled, and it uploads the artifact of the same build
+# run after re-checking its SHA-256. The version always comes from gradle.properties.
 on:
   push:
     branches: [fabric-1.21.1]
   workflow_dispatch:
     inputs:
-      version:
-        description: Mod version to publish
-        required: true
-        default: 1.0.2
-        type: string
+      publish:
+        description: Publish this build to CurseForge
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
-env:
-  RELEASE_VERSION: ${{ inputs.version || '1.0.2' }}
+concurrency:
+  group: fabric-1.21.1-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
-    concurrency:
-      group: curseforge-advanced-leveling-fabric-1.21.1-${{ github.ref_name }}
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -31,30 +32,82 @@ jobs:
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Normalize release version
+      - name: Read mod version
         run: |
-          version="${RELEASE_VERSION#v}"
+          version="$(sed -n 's/^fabric_version=//p' gradle.properties | tr -d '\r')"
           test -n "$version"
-          echo "CURSEFORGE_VERSION=$version" >> "$GITHUB_ENV"
-      - name: Validate CurseForge configuration
-        env:
-          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
-          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
-        run: |
-          test -n "$CURSEFORGE_PROJECT_ID"
-          test -n "$CURSEFORGE_TOKEN"
-      - name: Build mod
+          echo "MOD_VERSION=$version" >> "$GITHUB_ENV"
+          echo "mod_version=$version" >> "$GITHUB_OUTPUT"
+          echo "Using mod version $version"
+        id: version
+
+      - name: Build and test
         run: |
           chmod +x gradlew
           ./gradlew build --no-daemon
+
       - name: Verify artifact
         run: |
-          expected="advanced-leveling-fabric-1.21.1-${CURSEFORGE_VERSION}.jar"
+          expected="advanced-leveling-fabric-1.21.1-${MOD_VERSION}.jar"
           test -f "build/libs/$expected"
-          echo "CURSEFORGE_FILE=build/libs/$expected" >> "$GITHUB_ENV"
+          sha256sum "build/libs/$expected" > "build/libs/$expected.sha256"
+          cat "build/libs/$expected.sha256"
+          echo "JAR_FILE=$expected" >> "$GITHUB_ENV"
+
+      - name: Store test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: advanced-leveling-fabric-1.21.1-${{ env.MOD_VERSION }}-test-reports
+          path: |
+            build/reports/tests
+            build/reports/problems
+          if-no-files-found: ignore
+
+      - name: Store build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: advanced-leveling-fabric-1.21.1-${{ env.MOD_VERSION }}
+          path: |
+            build/libs/${{ env.JAR_FILE }}
+            build/libs/${{ env.JAR_FILE }}.sha256
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Read mod version
+        run: |
+          version="$(sed -n 's/^fabric_version=//p' gradle.properties | tr -d '\r')"
+          test -n "$version"
+          echo "MOD_VERSION=$version" >> "$GITHUB_ENV"
+          echo "Using mod version $version"
+
+      - name: Fetch built artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: advanced-leveling-fabric-1.21.1-${{ env.MOD_VERSION }}
+          path: build/libs
+
+      - name: Verify artifact of this run
+        run: |
+          expected="advanced-leveling-fabric-1.21.1-${MOD_VERSION}.jar"
+          test -f "build/libs/$expected"
+          sha256sum -c "build/libs/$expected.sha256"
+          echo "JAR_FILE=$expected" >> "$GITHUB_ENV"
+          echo "JAR_SHA256=$(cut -d" " -f1 "build/libs/$expected.sha256")" >> "$GITHUB_ENV"
+
       - name: Prepare current changelog
         run: |
-          awk -v version="$CURSEFORGE_VERSION" '
+          awk -v version="$MOD_VERSION" '
             /^##[[:space:]]+/ {
               heading = $2
               gsub(/^\[/, "", heading)
@@ -65,16 +118,92 @@ jobs:
             found { print }
           ' CHANGELOG.md > build/curseforge-changelog.md
           test -s build/curseforge-changelog.md
+
+      - name: Validate CurseForge configuration
+        env:
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          CURSEFORGE_TOKEN: ${{ secrets.CURSEFORGE_TOKEN }}
+        run: |
+          test "$CURSEFORGE_PROJECT_ID" = "1650366"
+          test -n "$CURSEFORGE_TOKEN"
+
       - name: Publish to CurseForge
+        id: publish
         uses: Kira-NT/mc-publish@v3
         with:
-          curseforge-id: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          curseforge-id: '1650366'
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
-          files: ${{ env.CURSEFORGE_FILE }}
-          version: ${{ env.CURSEFORGE_VERSION }}
-          name: advanced-leveling-fabric-1.21.1-${{ env.CURSEFORGE_VERSION }}
+          files: build/libs/${{ env.JAR_FILE }}
+          version: ${{ env.MOD_VERSION }}
+          name: advanced-leveling-fabric-1.21.1-${{ env.MOD_VERSION }}
           version-type: release
           changelog-file: build/curseforge-changelog.md
           loaders: fabric
           game-versions: 1.21.1
           java: 21
+          retry-attempts: 1
+          fail-mode: fail
+
+      - name: Record CurseForge receipt
+        env:
+          CF_VERSION: ${{ steps.publish.outputs.curseforge-version }}
+          CF_FILES: ${{ steps.publish.outputs.curseforge-files }}
+          CF_URL: ${{ steps.publish.outputs.curseforge-url }}
+          MOD_VERSION: ${{ env.MOD_VERSION }}
+          JAR_FILE: ${{ env.JAR_FILE }}
+          JAR_SHA256: ${{ env.JAR_SHA256 }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+
+          def raw(name):
+              return os.environ.get(name, "")
+
+          # The publication response is parsed as data; it is never spliced into shell source.
+          files = json.loads(raw("CF_FILES") or "[]")
+          if isinstance(files, dict):
+              files = [files]
+          receipt = {
+              "platform": "fabric",
+              "branch": "fabric-1.21.1",
+              "minecraft_version": "1.21.1",
+              "java": 21,
+              "mod_version": raw("MOD_VERSION"),
+              "curseforge_project_id": "1650366",
+              "curseforge_version_id": raw("CF_VERSION"),
+              "curseforge_url": raw("CF_URL"),
+              "curseforge_files": [
+                  {
+                      "id": item.get("id"),
+                      "name": item.get("name"),
+                      "url": item.get("url"),
+                      "size": item.get("size"),
+                  }
+                  for item in files
+              ],
+              "artifact": {
+                  "file": raw("JAR_FILE"),
+                  "sha256": raw("JAR_SHA256"),
+                  "size": os.path.getsize(pathlib.Path("build/libs") / raw("JAR_FILE")),
+              },
+              "source": {
+                  "commit": raw("GITHUB_SHA"),
+                  "workflow_run_id": raw("GITHUB_RUN_ID"),
+                  "workflow_run_attempt": raw("GITHUB_RUN_ATTEMPT"),
+              },
+          }
+          pathlib.Path("build/curseforge-receipt.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps({k: receipt[k] for k in ("mod_version", "curseforge_version_id", "curseforge_url")}, sort_keys=True))
+          print("CurseForge file ids:", [item["id"] for item in receipt["curseforge_files"]])
+          PY
+
+      - name: Store CurseForge receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: advanced-leveling-fabric-1.21.1-${{ env.MOD_VERSION }}-curseforge-receipt
+          path: build/curseforge-receipt.json
+          if-no-files-found: error

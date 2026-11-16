@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.3
+
+- Added a read-only `LevelingApi` for integrations: `displayLevel` returns the level this branch
+  already stores for a non-player entity and an empty result for players, hidden types and unleveled
+  entities, without writing entity data or adding an offset.
+- Unified the `mobs.hidden_levels` rule (exact entity ID or `namespace:*`) behind that API.
+- Replaced the bundled YiRanExpressionLib with the canonical 62,897 byte build
+  (`d797d9eaf22923b5f0d0d152b583aef3d60600bf349aa481a89ecd159255106a`), resolved only from
+  `libs/maven`, and added source, resolution and packaging gates with negative fixtures.
+- Documented that Loom generates the nested archive, so its digest differs from the canonical source
+  digest while every source entry is verified unchanged.
+- Publishing now happens only from a manual dispatch that uploads the artifact of the same build
+  run; a normal push builds and tests without publishing.
+
 ## 1.0.2
 
 - Added Fabric 1.21.1 support.

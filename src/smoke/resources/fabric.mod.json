@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "autoleveling_smoke",
+  "version": "1.0.0",
+  "name": "Advanced Leveling API smoke probe",
+  "description": "Test-only probe: calls the public LevelingApi on a real entity. Never shipped.",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["daripher.autoleveling.smoke.ApiSmokeProbe"]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.5",
+    "fabric-api": "*",
+    "minecraft": "~1.21.1",
+    "autoleveling": "*"
+  }
+}
