@@ -27,6 +27,72 @@ group = mod_group_id
 base { archivesName = "${mod_file_name}-forge-${minecraft_version}" }
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
+// ---------------------------------------------------------------------------------------------
+// YiRanExpressionLib: one pinned canonical binary, one allowed source, one derived Forge 43 wrapper.
+//
+// This branch used to resolve the library from JitPack with a 62894 byte archive under the
+// `1.0.1` coordinate. The canonical build shipped by the NeoForge 1.21.1 branch is the official
+// JitPack `universal` build of upstream commit 60584101e698d1e3f79d327b18982dec7ddb5465, pinned
+// here by size and SHA-256.
+//
+// The canonical library declares `loaderVersion="[47,)"`, which Forge 43 rejects at load time.
+// The compatibility packaging below derives a Forge 43 wrapper that changes ONLY that descriptor
+// line, keeps every other entry byte-identical, and is written to its own build output. The
+// canonical `libs/maven` artifact is never modified, and the wrapper never claims the canonical
+// hash: it is a derivation with its own recorded hash. Byte identity is not a license conclusion:
+// the library keeps its own LGPL v3.0 terms.
+// ---------------------------------------------------------------------------------------------
+def expressionLibGroup = 'com.github.yiran1457'
+def expressionLibArtifact = 'YiRanExpressionLib'
+def expressionLibVersion = '1.0.1'
+def expressionLibRange = '[1.0.1]'
+def expressionLibModId = 'yiranexpressionlib'
+def expressionLibLicense = 'LGPL v3.0'
+def expressionLibBytes = 62897L
+def expressionLibSha256 = 'd797d9eaf22923b5f0d0d152b583aef3d60600bf349aa481a89ecd159255106a'
+def expressionLibNotation = "${expressionLibGroup}:${expressionLibArtifact}:${expressionLibVersion}"
+def expressionLibDir = "libs/maven/${expressionLibGroup.replace('.', '/')}/${expressionLibArtifact}/${expressionLibVersion}"
+def expressionLibFile = file("${expressionLibDir}/${expressionLibArtifact}-${expressionLibVersion}.jar")
+def expressionLibPom = file("${expressionLibDir}/${expressionLibArtifact}-${expressionLibVersion}.pom")
+def expressionLibNestedPath = "META-INF/jarjar/${expressionLibArtifact}-${expressionLibVersion}.jar"
+def expressionLibMetadataPath = 'META-INF/jarjar/metadata.json'
+def expressionLibModsTomlPath = 'META-INF/mods.toml'
+def canonicalLoaderVersion = 'loaderVersion="[47,)"'
+def forge43LoaderVersion = 'loaderVersion="[43,)"'
+
+repositories {
+    // Gradle-exclusive source for the pinned library module: no other repository is even asked for
+    // `com.github.yiran1457:YiRanExpressionLib`, so a missing or tampered local module fails the
+    // resolution instead of falling through to JitPack or anywhere else.
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'localBundledLibraries'
+                url = layout.projectDirectory.dir('libs/maven')
+            }
+        }
+        filter { includeModule expressionLibGroup, expressionLibArtifact }
+    }
+}
+
+configurations {
+    // Resolvable view of the same coordinate, used only by the library gate below.
+    expressionLibResolution {
+        canBeConsumed = false
+        canBeResolved = true
+        visible = false
+    }
+}
+
+// Test-only probe sourceset used by the dedicated-server smoke check. It is never part of the mod
+// jar and is loaded as a separate mod by the `runServer` smoke invocation only.
+sourceSets {
+    smoke {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
+
 minecraft {
     mappings channel: mapping_channel, version: mapping_version
     copyIdeResources = true
@@ -46,8 +112,14 @@ minecraft {
             property 'forge.enabledGameTestNamespaces', mod_id
         }
         server {
+            workingDirectory project.file(providers.systemProperty('autoleveling.smoke.dir').getOrElse('run'))
             property 'forge.enabledGameTestNamespaces', mod_id
             args '--nogui'
+            mods {
+                autoleveling_smoke {
+                    source sourceSets.smoke
+                }
+            }
         }
         gameTestServer {
             property 'forge.enabledGameTestNamespaces', mod_id
@@ -76,14 +148,27 @@ sourceSets.main.java.exclude('daripher/autoleveling/mixin/client/**')
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
-    def expressionLib = implementation('com.github.yiran1457:YiRanExpressionLib:1.0.1')
+    def expressionLib = implementation(expressionLibNotation)
     jarJar(expressionLib)
 
     project.extensions.getByName('jarJar').versionInformation {
         // Match the version range used by other mods that bundle this library.
-        ranged(dependency(expressionLib), '[1.0.1]')
+        ranged(dependency(expressionLib), expressionLibRange)
     }
+
+    expressionLibResolution(expressionLibNotation) { transitive = false }
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
+
+// The JUnit sourceset runs against the same Minecraft/Forge classes as the mod, so the read-only API
+// rules and the attribute value modes are exercised without starting a client or a server.
+sourceSets.test.compileClasspath += sourceSets.main.compileClasspath
+sourceSets.test.runtimeClasspath += sourceSets.main.runtimeClasspath
+
+tasks.named('test', Test).configure { useJUnitPlatform() }
 
 tasks.named('build') {
     dependsOn 'reobfJarJar'
@@ -159,3 +244,315 @@ tasks.named('jarJar') {
         into 'META-INF/licenses/yiran-expression-lib'
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Library gates, the Forge 43 compatibility wrapper and the final release packaging.
+//
+// The canonical artifact, the wrapper and the release are three different byte streams and are
+// never conflated: the canonical hash proves what upstream shipped, the wrapper hash proves what
+// this branch actually nests, and the release hash proves what is uploaded.
+// ---------------------------------------------------------------------------------------------
+def sha256Hex = { byte[] data ->
+    java.security.MessageDigest.getInstance('SHA-256').digest(data).encodeHex().toString()
+}
+
+def readEntry = { java.util.zip.ZipFile zip, String name ->
+    java.util.zip.ZipEntry entry = zip.getEntry(name)
+    entry == null ? null : zip.getInputStream(entry).bytes
+}
+
+def entryNames = { java.util.zip.ZipFile zip -> zip.entries().collect { it.name }.sort() }
+
+def compatibleLibFile = layout.buildDirectory.file("forge119-compatible-lib/${expressionLibArtifact}-${expressionLibVersion}-forge43.jar")
+def compatibilityRecordFile = layout.buildDirectory.file('forge119-compatible-lib/compatibility.json')
+def releaseDir = layout.buildDirectory.dir('forge119-release')
+
+def verifyExpressionLibArtifact = tasks.register('verifyExpressionLibArtifact') {
+    description = 'Checks that the bundled YiRanExpressionLib artifact and POM are the pinned canonical ones.'
+    group = 'verification'
+    inputs.file(expressionLibFile)
+    inputs.file(expressionLibPom)
+    doLast {
+        if (!expressionLibFile.isFile()) {
+            throw new GradleException("missing bundled library artifact ${expressionLibDir}/${expressionLibFile.name}; " +
+                    'the build must not fall back to a different remote package')
+        }
+        byte[] data = expressionLibFile.bytes
+        if (data.length != expressionLibBytes || sha256Hex(data) != expressionLibSha256) {
+            throw new GradleException("${expressionLibFile.name} is not the official " +
+                    "${expressionLibArtifact}-${expressionLibVersion} universal build " +
+                    "(${data.length} bytes, sha256 ${sha256Hex(data)}); expected ${expressionLibBytes} bytes, " +
+                    "sha256 ${expressionLibSha256}")
+        }
+        def pom = new groovy.xml.XmlSlurper(false, false).parse(expressionLibPom)
+        def identity = [pom.groupId.text(), pom.artifactId.text(), pom.version.text(), pom.packaging.text()]
+        if (identity != [expressionLibGroup, expressionLibArtifact, expressionLibVersion, 'jar']) {
+            throw new GradleException("${expressionLibPom.name} declares ${identity}; expected " +
+                    "[${expressionLibGroup}, ${expressionLibArtifact}, ${expressionLibVersion}, jar]")
+        }
+    }
+}
+
+def verifyExpressionLibResolution = tasks.register('verifyExpressionLibResolution') {
+    description = 'Checks that the library coordinate resolves from the pinned local artifact only.'
+    group = 'verification'
+    dependsOn verifyExpressionLibArtifact
+    def resolved = configurations.expressionLibResolution.incoming.artifactView { it.lenient(false) }.files
+    doLast {
+        Set<File> files = resolved.files
+        if (files.size() != 1) {
+            throw new GradleException("${expressionLibNotation} must resolve to exactly one file, got ${files}")
+        }
+        File resolvedFile = files.first()
+        if (resolvedFile.canonicalFile != expressionLibFile.canonicalFile) {
+            throw new GradleException("${expressionLibNotation} resolved to ${resolvedFile} instead of the " +
+                    "pinned ${expressionLibFile}; the build must not resolve this library from elsewhere")
+        }
+    }
+}
+
+def packageForge119CompatibleLib = tasks.register('packageForge119CompatibleLib') {
+    description = 'Derives the Forge 43 wrapper of the canonical library, changing only the loaderVersion line.'
+    group = 'verification'
+    dependsOn verifyExpressionLibArtifact
+    inputs.file(expressionLibFile)
+    outputs.file(compatibleLibFile)
+    outputs.file(compatibilityRecordFile)
+    doLast {
+        File target = compatibleLibFile.get().asFile
+        target.parentFile.mkdirs()
+        byte[] canonicalModsToml
+        new java.util.zip.ZipFile(expressionLibFile).withCloseable { zip ->
+            canonicalModsToml = readEntry(zip, expressionLibModsTomlPath)
+        }
+        if (canonicalModsToml == null) {
+            throw new GradleException("canonical library is missing ${expressionLibModsTomlPath}")
+        }
+        String canonicalText = new String(canonicalModsToml, 'UTF-8')
+        if (!canonicalText.contains(canonicalLoaderVersion)) {
+            throw new GradleException("canonical ${expressionLibModsTomlPath} does not declare ${canonicalLoaderVersion}")
+        }
+        String adaptedText = canonicalText.replace(canonicalLoaderVersion, forge43LoaderVersion)
+        if (adaptedText == canonicalText || adaptedText.contains(canonicalLoaderVersion)) {
+            throw new GradleException('the Forge 43 loaderVersion rewrite did not apply exactly once')
+        }
+        byte[] adaptedModsToml = adaptedText.getBytes('UTF-8')
+        target.withOutputStream { raw ->
+            new java.util.zip.ZipOutputStream(raw).withCloseable { out ->
+                new java.util.zip.ZipFile(expressionLibFile).withCloseable { zip ->
+                    zip.entries().each { entry ->
+                        java.util.zip.ZipEntry copy = new java.util.zip.ZipEntry(entry.name)
+                        if (entry.time >= 0) copy.setTime(entry.time)
+                        out.putNextEntry(copy)
+                        if (!entry.directory) {
+                            byte[] bytes = entry.name == expressionLibModsTomlPath
+                                    ? adaptedModsToml
+                                    : readEntry(zip, entry.name)
+                            out.write(bytes)
+                        }
+                        out.closeEntry()
+                    }
+                }
+            }
+        }
+        byte[] wrapperBytes = target.bytes
+        def record = [
+                canonical: [
+                        path  : "libs/maven/${expressionLibGroup.replace('.', '/')}/${expressionLibArtifact}/${expressionLibVersion}/${expressionLibArtifact}-${expressionLibVersion}.jar",
+                        bytes : expressionLibBytes,
+                        sha256: expressionLibSha256,
+                ],
+                wrapper  : [
+                        path  : "build/forge119-compatible-lib/${expressionLibArtifact}-${expressionLibVersion}-forge43.jar",
+                        bytes : wrapperBytes.length,
+                        sha256: sha256Hex(wrapperBytes),
+                        note  : 'derived Forge 43 packaging of the canonical library; it is NOT the upstream jar and does not carry the canonical hash',
+                ],
+                change   : [
+                        entry   : expressionLibModsTomlPath,
+                        from    : canonicalLoaderVersion,
+                        to      : forge43LoaderVersion,
+                        entries : 'every other entry is copied byte-for-byte from the canonical jar',
+                ],
+        ]
+        File recordFile = compatibilityRecordFile.get().asFile
+        recordFile.parentFile.mkdirs()
+        recordFile.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(record))
+        logger.lifecycle("Forge 43 compatibility wrapper: ${wrapperBytes.length} bytes, sha256 ${sha256Hex(wrapperBytes)}")
+    }
+}
+
+def verifyForge119CompatibleLib = tasks.register('verifyForge119CompatibleLib') {
+    description = 'Proves the Forge 43 wrapper differs from the canonical library only in the loaderVersion line.'
+    group = 'verification'
+    dependsOn packageForge119CompatibleLib
+    inputs.file(compatibleLibFile)
+    inputs.file(expressionLibFile)
+    doLast {
+        File wrapper = compatibleLibFile.get().asFile
+        if (!wrapper.isFile()) throw new GradleException("missing Forge 43 wrapper ${wrapper}")
+        new java.util.zip.ZipFile(expressionLibFile).withCloseable { canonical ->
+            new java.util.zip.ZipFile(wrapper).withCloseable { derived ->
+                List<String> canonicalNames = entryNames(canonical)
+                List<String> derivedNames = entryNames(derived)
+                if (canonicalNames != derivedNames) {
+                    throw new GradleException("the Forge 43 wrapper changed the entry set: " +
+                            "${canonicalNames.size()} canonical entries vs ${derivedNames.size()} wrapper entries")
+                }
+                List<String> changed = []
+                canonicalNames.each { name ->
+                    byte[] left = readEntry(canonical, name)
+                    byte[] right = readEntry(derived, name)
+                    boolean same = java.util.Arrays.equals(left, right)
+                    if (!same) changed.add(name)
+                }
+                if (changed != [expressionLibModsTomlPath]) {
+                    throw new GradleException("the Forge 43 wrapper may change only ${expressionLibModsTomlPath}, changed ${changed}")
+                }
+                String canonicalText = new String(readEntry(canonical, expressionLibModsTomlPath), 'UTF-8')
+                String derivedText = new String(readEntry(derived, expressionLibModsTomlPath), 'UTF-8')
+                if (derivedText.replace(forge43LoaderVersion, canonicalLoaderVersion) != canonicalText) {
+                    throw new GradleException("${expressionLibModsTomlPath} differs beyond the single loaderVersion line")
+                }
+                if (derivedText.contains(canonicalLoaderVersion)) {
+                    throw new GradleException("the wrapper still declares ${canonicalLoaderVersion}")
+                }
+                logger.lifecycle("Forge 43 wrapper verified: only ${expressionLibModsTomlPath} differs")
+            }
+        }
+    }
+}
+
+def packageForge119Release = tasks.register('packageForge119Release') {
+    description = 'Builds the final Forge 1.19.2 release jar by nesting the verified Forge 43 wrapper.'
+    group = 'verification'
+    dependsOn 'reobfJarJar'
+    dependsOn verifyForge119CompatibleLib
+    def jarJarTask = tasks.named('jarJar')
+    inputs.file(jarJarTask.flatMap { it.archiveFile })
+    inputs.file(compatibleLibFile)
+    outputs.dir(releaseDir)
+    doLast {
+        File source = jarJarTask.get().archiveFile.get().asFile
+        if (!source.isFile()) throw new GradleException("missing reobfJarJar output ${source}")
+        File target = releaseDir.get().file(source.name).asFile
+        target.parentFile.mkdirs()
+        byte[] wrapper = compatibleLibFile.get().asFile.bytes
+        target.withOutputStream { raw ->
+            new java.util.zip.ZipOutputStream(raw).withCloseable { out ->
+                new java.util.zip.ZipFile(source).withCloseable { zip ->
+                    zip.entries().each { entry ->
+                        java.util.zip.ZipEntry copy = new java.util.zip.ZipEntry(entry.name)
+                        if (entry.time >= 0) copy.setTime(entry.time)
+                        out.putNextEntry(copy)
+                        if (!entry.directory) {
+                            out.write(entry.name == expressionLibNestedPath ? wrapper : readEntry(zip, entry.name))
+                        }
+                        out.closeEntry()
+                    }
+                }
+            }
+        }
+        byte[] releaseBytes = target.bytes
+        def record = [
+                source             : source.name,
+                release            : target.name,
+                bytes              : releaseBytes.length,
+                sha256             : sha256Hex(releaseBytes),
+                nestedLibraryPath  : expressionLibNestedPath,
+                nestedLibraryBytes : wrapper.length,
+                nestedLibrarySha256: sha256Hex(wrapper),
+                canonicalSha256    : expressionLibSha256,
+                note               : 'the nested library in this release is the derived Forge 43 wrapper, not the canonical upstream jar',
+        ]
+        File recordFile = releaseDir.get().file('release.json').asFile
+        recordFile.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(record))
+        logger.lifecycle("Forge 1.19.2 final release: ${target} (${releaseBytes.length} bytes, sha256 ${sha256Hex(releaseBytes)})")
+    }
+}
+
+def verifyForge119Release = tasks.register('verifyForge119Release') {
+    description = 'Checks the final Forge 1.19.2 release nests the verified wrapper and keeps every other entry intact.'
+    group = 'verification'
+    dependsOn packageForge119Release
+    def jarJarTask = tasks.named('jarJar')
+    doLast {
+        File source = jarJarTask.get().archiveFile.get().asFile
+        File release = releaseDir.get().file(source.name).asFile
+        File wrapperFile = compatibleLibFile.get().asFile
+        if (!release.isFile()) throw new GradleException("missing final Forge 1.19.2 release ${release}")
+        byte[] wrapper = wrapperFile.bytes
+        new java.util.zip.ZipFile(source).withCloseable { base ->
+            new java.util.zip.ZipFile(release).withCloseable { finalJar ->
+                List<String> baseNames = entryNames(base)
+                List<String> releaseNames = entryNames(finalJar)
+                if (baseNames != releaseNames) {
+                    throw new GradleException("the final release changed the entry set of ${source.name}")
+                }
+                baseNames.each { name ->
+                    if (name == expressionLibNestedPath) return
+                    if (!java.util.Arrays.equals(readEntry(base, name), readEntry(finalJar, name))) {
+                        throw new GradleException("the final release changed ${name}, only the nested library may differ")
+                    }
+                }
+                byte[] nested = readEntry(finalJar, expressionLibNestedPath)
+                if (nested == null) throw new GradleException("the final release is missing ${expressionLibNestedPath}")
+                if (!java.util.Arrays.equals(nested, wrapper)) {
+                    throw new GradleException("the final release nests something other than the verified Forge 43 wrapper")
+                }
+                def metadata = new groovy.json.JsonSlurper().parse(readEntry(finalJar, expressionLibMetadataPath))
+                if (!(metadata.jars instanceof List) || metadata.jars.size() != 1) {
+                    throw new GradleException('the final release must nest exactly one library')
+                }
+                def entry = metadata.jars[0]
+                if ((entry.identifier ?: [:]).group != expressionLibGroup
+                        || (entry.identifier ?: [:]).artifact != expressionLibArtifact
+                        || (entry.version ?: [:]).range != expressionLibRange
+                        || (entry.version ?: [:]).artifactVersion != expressionLibVersion
+                        || entry.path != expressionLibNestedPath) {
+                    throw new GradleException("the final release nests an unexpected library entry ${entry}")
+                }
+                logger.lifecycle("final release verified: ${release.name} nests the Forge 43 wrapper ${sha256Hex(wrapper)}")
+            }
+        }
+    }
+}
+
+// The smoke probe is a test-only mod; it must never end up in the final release.
+def verifyNoProbeClassesInRelease = tasks.register('verifyNoProbeClassesInRelease') {
+    description = 'Checks that the final Forge 1.19.2 release contains no smoke-probe classes.'
+    group = 'verification'
+    dependsOn packageForge119Release
+    doLast {
+        File release = releaseDir.get().file("advanced-leveling-forge-1.19.2-${project.version}-all.jar").asFile
+        if (!release.isFile()) throw new GradleException("missing final Forge 1.19.2 release ${release}")
+        new java.util.zip.ZipFile(release).withCloseable { archive ->
+            List<String> probeEntries = archive.entries()
+                    .collect { it.name }
+                    .findAll { it.startsWith('daripher/autoleveling/smoke/') }
+            if (!probeEntries.isEmpty()) {
+                throw new GradleException("the final release contains smoke-probe entries: ${probeEntries}")
+            }
+        }
+    }
+}
+
+// The smoke server must load the same derived library the release nests, not the canonical jar the
+// Forge 43 loader rejects. This affects the development runtime classpath only: the jarJar
+// configuration and the final release packaging keep using the canonical artifact.
+configurations.runtimeClasspath {
+    exclude group: expressionLibGroup, module: expressionLibArtifact
+}
+dependencies {
+    runtimeOnly files(compatibleLibFile)
+}
+
+// Anything that resolves the development runtime classpath also needs the wrapper task to have run.
+tasks.configureEach { task ->
+    if (task.name == 'test' || task.name.startsWith('run')) {
+        task.dependsOn packageForge119CompatibleLib
+    }
+}
+
+tasks.named('check') { dependsOn verifyExpressionLibResolution, verifyForge119CompatibleLib }
+tasks.named('build') { dependsOn verifyForge119Release, verifyNoProbeClassesInRelease }

@@ -1,0 +1,23 @@
+modLoader="javafml"
+loaderVersion="[43,)"
+license="GNU AGPLv3"
+
+[[mods]]
+modId="autoleveling_smoke"
+version="1.0.0"
+displayName="Advanced Leveling smoke probe"
+description='''Test-only read-only API probe. Never shipped in a release.'''
+
+[[dependencies.autoleveling_smoke]]
+    modId="forge"
+    mandatory=true
+    versionRange="[43,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.autoleveling_smoke]]
+    modId="autoleveling"
+    mandatory=true
+    versionRange="[1.0.0,)"
+    ordering="AFTER"
+    side="BOTH"

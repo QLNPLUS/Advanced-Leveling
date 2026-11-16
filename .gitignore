@@ -22,8 +22,14 @@ build
 eclipse
 run
 
-# Local Maven fallback used when JitPack is unavailable
-libs/maven/
+# The pinned library under libs/maven is intentionally committed and is the only allowed
+# source for that coordinate; there is no JitPack fallback.
 
 # Files from Forge MDK
 forge*changelog.txt
+
+# Isolated local smoke run directories
+run-smoke-*/
+
+# ForgeGradle local run logs
+logs/
