@@ -77,6 +77,25 @@ Datapack `attribute_modifiers` also accept an expression:
 }
 ```
 
+## Read-only level API
+
+`daripher.autoleveling.api.LevelingApi` lets another mod read the level Advanced Leveling
+displays, without changing anything:
+
+```java
+OptionalInt level = LevelingApi.displayLevel(livingEntity);
+boolean hidden = LevelingApi.isHidden(entityType);
+```
+
+- The result is the saved zero-based `LEVEL` value plus one, i.e. the number on the level
+  plate. A saved zero is a real level and reports `1`.
+- The result is empty for players, for a missing or non-integer `LEVEL` value, for a
+  negative value, for a value that would overflow when incremented, and for entity types
+  listed in `mobs.hidden_levels`.
+- The call only reads. It never writes NBT, never refreshes attributes, equipment or
+  drops, and has no client-only references, so it is safe on a dedicated server.
+- `isHidden` is the same exact-ID / `namespace:*` rule every display path uses.
+
 ## Building
 
 Java 17 is required.
@@ -86,10 +105,11 @@ Java 17 is required.
 ```
 
 The distributable jar is generated as
-`build/libs/AdvancedLeveling-1.20.1-1.0.1-all.jar`.
+`build/libs/advanced-leveling-forge-1.20.1-1.0.3-all.jar`.
 
-YiRanExpressionLib is normally resolved from JitPack. The `libs/maven` directory is
-an optional local Maven fallback; its jar is intentionally not committed.
+The YiRanExpressionLib artifact committed under `libs/maven` is the pinned canonical
+1.0.1 build (62897 bytes). It is the only source Gradle is allowed to resolve that
+coordinate from, and the build fails if the artifact is missing or edited.
 
 ## Upstream and licensing
 

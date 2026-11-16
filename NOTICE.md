@@ -27,6 +27,12 @@ YiRanExpressionLib project associated with the Maven coordinate and repository:
 
 https://github.com/yiran1457/YiRanExpressionLib
 
+The nested artifact is the pinned canonical 1.0.1 build: 62897 bytes, SHA-256
+`d797d9eaf22923b5f0d0d152b583aef3d60600bf349aa481a89ecd159255106a`. The build resolves this
+coordinate only from the repository copy under `libs/maven`, and it fails when the artifact is
+missing or edited instead of falling back to a remote package. Byte identity is not a license
+conclusion: the library keeps its own LGPL v3.0 terms.
+
 YiRanExpressionLib remains copyright its author and contributors and is not relicensed
 by this project.
 

@@ -27,7 +27,47 @@ base {
 // Mojang ships Java 17 to end users in 1.18+, so your mod should target Java 17.
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
+// ---------------------------------------------------------------------------------------------
+// YiRanExpressionLib: one pinned binary, one allowed source.
+//
+// This branch used to resolve the library from JitPack with a 62894 byte archive under the
+// `1.0.1` coordinate. The canonical build shipped by the NeoForge 1.21.1 branch is the official
+// JitPack `universal` build of upstream commit 60584101e698d1e3f79d327b18982dec7ddb5465, pinned
+// here by size and SHA-256. Byte identity is not a license conclusion: the library keeps its own
+// LGPL v3.0 terms.
+//
+// Consequences enforced by the tasks at the bottom of this file:
+//   * the coordinate is declared as Gradle exclusive content of the local `libs/maven` repository,
+//     so no other repository is searched for it and there is no JitPack fallback,
+//   * a missing or edited local artifact fails the build instead of silently changing binaries,
+//   * the packaged jar nests exactly one library and those bytes are the pinned ones.
+// ---------------------------------------------------------------------------------------------
+def expressionLibGroup = 'com.github.yiran1457'
+def expressionLibArtifact = 'YiRanExpressionLib'
+def expressionLibVersion = '1.0.1'
+def expressionLibRange = '[1.0.1]'
+def expressionLibModId = 'yiranexpressionlib'
+def expressionLibLicense = 'LGPL v3.0'
+def expressionLibBytes = 62897L
+def expressionLibSha256 = 'd797d9eaf22923b5f0d0d152b583aef3d60600bf349aa481a89ecd159255106a'
+def expressionLibNotation = "${expressionLibGroup}:${expressionLibArtifact}:${expressionLibVersion}"
+def expressionLibDir = "libs/maven/${expressionLibGroup.replace('.', '/')}/${expressionLibArtifact}/${expressionLibVersion}"
+def expressionLibFile = file("${expressionLibDir}/${expressionLibArtifact}-${expressionLibVersion}.jar")
+def expressionLibPom = file("${expressionLibDir}/${expressionLibArtifact}-${expressionLibVersion}.pom")
+def expressionLibNestedPath = "META-INF/jarjar/${expressionLibArtifact}-${expressionLibVersion}.jar"
+def expressionLibMetadataPath = 'META-INF/jarjar/metadata.json'
+def expressionLibDescriptors = ['META-INF/mods.toml', 'META-INF/neoforge.mods.toml']
+
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
+
+// Test-only probe sourceset used by the dedicated-server smoke check. It is never part of the mod
+// jar and is loaded as a separate mod by the `runServer` smoke invocation only.
+sourceSets {
+    smoke {
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.output + sourceSets.main.runtimeClasspath
+    }
+}
 minecraft {
     // The mappings can be changed at any time and must be in the following format.
     // Channel:   Version:
@@ -99,7 +139,7 @@ minecraft {
         }
 
         server {
-            workingDirectory project.file('run')
+            workingDirectory project.file(providers.systemProperty('autoleveling.smoke.dir').getOrElse('run'))
 
             property 'forge.logging.markers', 'REGISTRIES'
 
@@ -110,6 +150,9 @@ minecraft {
             mods {
                 "${mod_id}" {
                     source sourceSets.main
+                }
+                autoleveling_smoke {
+                    source sourceSets.smoke
                 }
             }
         }
@@ -158,10 +201,18 @@ jarJar.enable()
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
-    if (file('libs/maven/com/github/yiran1457/YiRanExpressionLib/1.0.1/YiRanExpressionLib-1.0.1.jar').exists()) {
-        maven { url layout.projectDirectory.dir('libs/maven') }
+    // Gradle-exclusive source for the pinned library module: no other repository is even asked for
+    // `com.github.yiran1457:YiRanExpressionLib`, so a missing or tampered local module fails the
+    // resolution instead of falling through to JitPack or anywhere else.
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'localBundledLibraries'
+                url = layout.projectDirectory.dir('libs/maven')
+            }
+        }
+        filter { includeModule expressionLibGroup, expressionLibArtifact }
     }
-    maven { url 'https://jitpack.io' }
     maven {
         url "https://www.cursemaven.com"
         content {
@@ -170,13 +221,23 @@ repositories {
     }
 }
 
+configurations {
+    // Resolvable view of the same coordinate, used only by the library gate below.
+    expressionLibResolution {
+        canBeConsumed = false
+        canBeResolved = true
+        visible = false
+    }
+}
+
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
-    def expressionLib = implementation("com.github.yiran1457:YiRanExpressionLib:1.0.1")
+    def expressionLib = implementation(expressionLibNotation)
     jarJar(expressionLib)
-    jarJar.ranged(expressionLib, '[1.0.1,1.0.1]')
-    jarJar.pin(expressionLib, '1.0.1')
+    jarJar.ranged(expressionLib, expressionLibRange)
+    jarJar.pin(expressionLib, expressionLibVersion)
+    expressionLibResolution(expressionLibNotation) { transitive = false }
     // jade
 	implementation fg.deobf("curse.maven:jade-324717:4573194")
     // neat
@@ -187,7 +248,18 @@ dependencies {
     implementation fg.deobf("curse.maven:attributefix-280510:4648448")
     // max health fix
     implementation fg.deobf("curse.maven:max-health-fix-492246:4648479")
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
+
+// The JUnit sourceset runs against the same Minecraft/Forge classes as the mod, so the read-only API
+// rules and the attribute value modes are exercised without starting a client or a server.
+sourceSets.test.compileClasspath += sourceSets.main.compileClasspath
+sourceSets.test.runtimeClasspath += sourceSets.main.runtimeClasspath
+
+tasks.named('test', Test).configure { useJUnitPlatform() }
 
 mixin {
     add sourceSets.main, 'autoleveling.refmap.json'
@@ -258,3 +330,147 @@ tasks.named('jarJar') {
         into 'META-INF/licenses/yiran-expression-lib'
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Library gates. See the pinned facts above; these tasks only report what the bytes are.
+// ---------------------------------------------------------------------------------------------
+def sha256Hex = { byte[] data ->
+    java.security.MessageDigest.getInstance('SHA-256').digest(data).encodeHex().toString()
+}
+
+def verifyExpressionLibArtifact = tasks.register('verifyExpressionLibArtifact') {
+    description = 'Checks that the bundled YiRanExpressionLib artifact and POM are the pinned ones.'
+    group = 'verification'
+    inputs.file(expressionLibFile)
+    inputs.file(expressionLibPom)
+    doLast {
+        if (!expressionLibFile.isFile()) {
+            throw new GradleException("missing bundled library artifact ${expressionLibDir}/${expressionLibFile.name}; " +
+                    'the build must not fall back to a different remote package')
+        }
+        byte[] data = expressionLibFile.bytes
+        if (data.length != expressionLibBytes || sha256Hex(data) != expressionLibSha256) {
+            throw new GradleException("${expressionLibFile.name} is not the official " +
+                    "${expressionLibArtifact}-${expressionLibVersion} universal build " +
+                    "(${data.length} bytes, sha256 ${sha256Hex(data)}); expected ${expressionLibBytes} bytes, " +
+                    "sha256 ${expressionLibSha256}")
+        }
+        def pom = new groovy.xml.XmlSlurper(false, false).parse(expressionLibPom)
+        def identity = [pom.groupId.text(), pom.artifactId.text(), pom.version.text(), pom.packaging.text()]
+        if (identity != [expressionLibGroup, expressionLibArtifact, expressionLibVersion, 'jar']) {
+            throw new GradleException("${expressionLibPom.name} declares ${identity}; expected " +
+                    "[${expressionLibGroup}, ${expressionLibArtifact}, ${expressionLibVersion}, jar]")
+        }
+    }
+}
+
+def verifyExpressionLibResolution = tasks.register('verifyExpressionLibResolution') {
+    description = 'Checks that the library coordinate resolves from the pinned local artifact only.'
+    group = 'verification'
+    dependsOn verifyExpressionLibArtifact
+    def resolved = configurations.expressionLibResolution.incoming.artifactView { it.lenient(false) }.files
+    doLast {
+        Set<File> files = resolved.files
+        if (files.size() != 1) {
+            throw new GradleException("${expressionLibNotation} must resolve to exactly one file, got ${files}")
+        }
+        File resolvedFile = files.first()
+        if (resolvedFile.canonicalFile != expressionLibFile.canonicalFile) {
+            throw new GradleException("${expressionLibNotation} resolved to ${resolvedFile} instead of the " +
+                    "pinned ${expressionLibFile}; the build must not resolve this library from elsewhere")
+        }
+    }
+}
+
+def verifyPackagedExpressionLib = tasks.register('verifyPackagedExpressionLib') {
+    description = 'Checks the packaged mod jar nests exactly one library and those bytes are the pinned ones.'
+    group = 'verification'
+    def jarJarTask = tasks.named('jarJar')
+    dependsOn jarJarTask
+    inputs.file(jarJarTask.flatMap { it.archiveFile })
+    doLast {
+        File packaged = jarJarTask.get().archiveFile.get().asFile
+        if (!packaged.isFile()) {
+            throw new GradleException("the jarJar output ${packaged} does not exist")
+        }
+        new java.util.zip.ZipFile(packaged).withCloseable { archive ->
+            List<String> names = archive.entries().collect { it.name }
+            [expressionLibMetadataPath, expressionLibNestedPath].each { required ->
+                int count = names.count { it == required }
+                if (count != 1) {
+                    throw new GradleException("${required} must appear exactly once in ${packaged.name}, found ${count}")
+                }
+            }
+            List<String> nested = names.findAll { it.startsWith('META-INF/jarjar/') && it.endsWith('.jar') }.sort()
+            if (nested != [expressionLibNestedPath]) {
+                throw new GradleException("exactly one nested JAR ${expressionLibNestedPath} is allowed, found ${nested}")
+            }
+            def metadata = new groovy.json.JsonSlurper().parse(archive.getInputStream(archive.getEntry(expressionLibMetadataPath)))
+            if (!(metadata.jars instanceof List) || metadata.jars.size() != 1) {
+                throw new GradleException('JarJar metadata must contain exactly one nested library entry')
+            }
+            def entry = metadata.jars[0]
+            def identifier = entry.identifier ?: [:]
+            def libraryVersion = entry.version ?: [:]
+            if (identifier.group != expressionLibGroup || identifier.artifact != expressionLibArtifact) {
+                throw new GradleException("JarJar identity must be ${expressionLibNotation}, got ${identifier}")
+            }
+            if (libraryVersion.range != expressionLibRange || libraryVersion.artifactVersion != expressionLibVersion) {
+                throw new GradleException("JarJar version must be range ${expressionLibRange} / ${expressionLibVersion}, " +
+                        "got ${libraryVersion}")
+            }
+            if (entry.path != expressionLibNestedPath) {
+                throw new GradleException("JarJar path must be ${expressionLibNestedPath}, got ${entry.path}")
+            }
+            byte[] nestedBytes = archive.getInputStream(archive.getEntry(expressionLibNestedPath)).bytes
+            if (nestedBytes.length != expressionLibBytes || sha256Hex(nestedBytes) != expressionLibSha256) {
+                throw new GradleException("nested ${expressionLibNestedPath} is not the pinned build " +
+                        "(${nestedBytes.length} bytes, sha256 ${sha256Hex(nestedBytes)})")
+            }
+            new java.util.zip.ZipInputStream(new ByteArrayInputStream(nestedBytes)).withCloseable { nestedJar ->
+                Map<String, String> descriptors = [:]
+                for (def entryStream = nestedJar.nextEntry; entryStream != null; entryStream = nestedJar.nextEntry) {
+                    if (expressionLibDescriptors.contains(entryStream.name)) {
+                        ByteArrayOutputStream text = new ByteArrayOutputStream()
+                        byte[] chunk = new byte[8192]
+                        for (int read = nestedJar.read(chunk); read > 0; read = nestedJar.read(chunk)) {
+                            text.write(chunk, 0, read)
+                        }
+                        descriptors[entryStream.name] = text.toString('UTF-8')
+                    }
+                }
+                String modsToml = descriptors['META-INF/mods.toml']
+                if (modsToml == null) {
+                    throw new GradleException('nested library is missing META-INF/mods.toml')
+                }
+                [modId: expressionLibModId, version: expressionLibVersion, license: expressionLibLicense].each { key, value ->
+                    if (!modsToml.contains("${key}=\"${value}\"")) {
+                        throw new GradleException("nested META-INF/mods.toml does not declare ${key}=\"${value}\"")
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The smoke probe is a test-only mod; it must never end up in the distributable jar.
+def verifyNoProbeClassesInJar = tasks.register('verifyNoProbeClassesInJar') {
+    description = 'Checks that the distributable jar contains no smoke-probe classes.'
+    group = 'verification'
+    def jarJarTask = tasks.named('jarJar')
+    dependsOn jarJarTask
+    doLast {
+        File packaged = jarJarTask.get().archiveFile.get().asFile
+        new java.util.zip.ZipFile(packaged).withCloseable { archive ->
+            List<String> probeEntries = archive.entries()
+                    .collect { it.name }
+                    .findAll { it.startsWith('daripher/autoleveling/smoke/') || it == 'META-INF/autoleveling_smoke.mods.toml' }
+            if (!probeEntries.isEmpty()) {
+                throw new GradleException("the distributable jar contains smoke-probe entries: ${probeEntries}")
+            }
+        }
+    }
+}
+
+tasks.named('check') { dependsOn verifyExpressionLibResolution }
+tasks.named('build') { dependsOn verifyPackagedExpressionLib, verifyNoProbeClassesInJar }
