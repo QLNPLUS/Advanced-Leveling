@@ -1,0 +1,9 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "AGPL-3.0-only"
+
+[[mods]]
+modId = "autoleveling_smoke"
+version = "1.0.0"
+displayName = "Advanced Leveling API smoke probe"
+description = "Test-only probe: calls the public LevelingApi on a real entity. Never shipped."

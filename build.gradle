@@ -14,10 +14,62 @@ group = mod_group_id
 base { archivesName = "${mod_file_name}-neoforge-${minecraft_version}" }
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
-repositories {
-    maven { url = layout.projectDirectory.dir('libs/maven') }
-    maven { url = 'https://jitpack.io' }
+// ---------------------------------------------------------------------------------------------
+// YiRanExpressionLib: one pinned binary, one allowed source.
+//
+// The distributable artifact nests this library through NeoForge JarJar, which copies the resolved
+// bytes, so the nested archive has to be the canonical one byte for byte. That is only believable
+// if the source artifact is pinned and cannot be resolved from anywhere else, which is what the
+// tasks at the bottom of this file enforce:
+//   * the coordinate is exclusive content of the local `libs/maven` repository, so no other
+//     repository is searched and there is no remote fallback,
+//   * a missing or edited local artifact fails the build instead of silently changing binaries,
+//   * the packaged jar nests exactly one library and those bytes are the pinned ones.
+//
+// Byte identity is not a license conclusion: the library keeps its own LGPL v3.0 terms.
+// ---------------------------------------------------------------------------------------------
+def expressionLibGroup = 'com.github.yiran1457'
+def expressionLibArtifact = 'YiRanExpressionLib'
+def expressionLibVersion = '1.0.1'
+def expressionLibRange = '[1.0.1]'
+def expressionLibModId = 'yiranexpressionlib'
+def expressionLibLicense = 'LGPL v3.0'
+def expressionLibBytes = 62897L
+def expressionLibSha256 = 'd797d9eaf22923b5f0d0d152b583aef3d60600bf349aa481a89ecd159255106a'
+def expressionLibNotation = "${expressionLibGroup}:${expressionLibArtifact}:${expressionLibVersion}"
+def expressionLibDir = "libs/maven/${expressionLibGroup.replace('.', '/')}/${expressionLibArtifact}/${expressionLibVersion}"
+def expressionLibSourceJar = file("${expressionLibDir}/${expressionLibArtifact}-${expressionLibVersion}.jar")
+def expressionLibSourcePom = file("${expressionLibDir}/${expressionLibArtifact}-${expressionLibVersion}.pom")
+def expressionLibNestedPath = "META-INF/jarjar/${expressionLibArtifact}-${expressionLibVersion}.jar"
+def expressionLibMetadataPath = 'META-INF/jarjar/metadata.json'
+def expressionLibDescriptors = ['META-INF/neoforge.mods.toml', 'META-INF/mods.toml']
+def expressionLibGateFixturesDir = layout.buildDirectory.dir('expression-lib-gate-fixtures')
+
+configurations {
+    // Resolvable view of the same coordinate, used only by the library gate below.
+    expressionLibResolution {
+        canBeConsumed = false
+        canBeResolved = true
+        visible = false
+    }
 }
+
+repositories {
+    // Gradle-exclusive source for the pinned library module: no other repository is even asked for
+    // `com.github.yiran1457:YiRanExpressionLib`, so a missing or tampered local module fails the
+    // resolution instead of falling through to JitPack or anywhere else.
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'localBundledLibraries'
+                url = layout.projectDirectory.dir('libs/maven')
+            }
+        }
+        filter { includeModule expressionLibGroup, expressionLibArtifact }
+    }
+}
+
+repositories { maven { url = 'https://jitpack.io' } }
 
 neoForge {
     enable {
@@ -52,6 +104,11 @@ neoForge {
             sourceSet sourceSets.main
         }
     }
+    // Run the plain JUnit sourceset in src/test/java against Minecraft and this mod's classes.
+    unitTest {
+        enable()
+        testedMod = mods."${mod_id}"
+    }
 }
 
 sourceSets.main.java.srcDir 'src/main/java'
@@ -67,14 +124,38 @@ configurations {
 }
 
 dependencies {
-    def expressionLib = implementation('com.github.yiran1457:YiRanExpressionLib:1.0.1')
+    def expressionLib = implementation(expressionLibNotation)
     jarJar(expressionLib) {
         version {
-            strictly '[1.0.1]'
-            prefer '1.0.1'
+            strictly expressionLibRange
+            prefer expressionLibVersion
         }
     }
+    expressionLibResolution(expressionLibNotation)
     compileOnly(files('libs/Jade-1.21.1-NeoForge-15.10.6.jar'))
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test', Test).configure { useJUnitPlatform() }
+
+// Test-only smoke probe: its own tiny mod jar, loaded only from the development server's mods
+// folder. It never enters the distributable artifact.
+sourceSets {
+    smoke {
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+
+tasks.register('smokeProbeJar', Jar) {
+    description = 'Builds the test-only API smoke probe jar used by the dedicated-server smoke.'
+    group = 'verification'
+    from sourceSets.smoke.output
+    archiveFileName = 'api-smoke-probe.jar'
+    destinationDirectory = layout.buildDirectory.dir('smoke')
 }
 
 def generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
@@ -125,3 +206,279 @@ tasks.named('jar', Jar).configure {
         into 'META-INF/licenses/yiran-expression-lib'
     }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Library gates. See the pinned facts above; these tasks only report what the bytes are.
+// ---------------------------------------------------------------------------------------------
+def sha256Hex = { byte[] data ->
+    java.security.MessageDigest.getInstance('SHA-256').digest(data).encodeHex().toString()
+}
+
+// Reads one entry of an open ZipInputStream. Groovy's InputStream.getBytes() closes the stream it
+// reads from, which would abort the entry walk, so the bytes are copied by hand.
+def readEntryBytes = { java.io.InputStream input ->
+    java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream()
+    byte[] chunk = new byte[8192]
+    for (int read = input.read(chunk); read > 0; read = input.read(chunk)) {
+        buffer.write(chunk, 0, read)
+    }
+    buffer.toByteArray()
+}
+
+def readEntryDigests = { File jarFile ->
+    Map<String, String> digests = new TreeMap<>()
+    new java.util.zip.ZipFile(jarFile).withCloseable { archive ->
+        archive.entries().each { entry ->
+            if (!entry.isDirectory()) {
+                digests[entry.name] = sha256Hex(archive.getInputStream(entry).bytes)
+            }
+        }
+    }
+    digests
+}
+
+// Fixture helper: rebuild a jar with one entry removed or one entry added.
+def copyEntries = { File source, File target, String skipEntry, String extraEntry ->
+    new java.util.zip.ZipOutputStream(new FileOutputStream(target)).withCloseable { out ->
+        new java.util.zip.ZipFile(source).withCloseable { archive ->
+            archive.entries().each { entry ->
+                if (entry.name == skipEntry) return
+                out.putNextEntry(new java.util.zip.ZipEntry(entry.name))
+                if (!entry.isDirectory()) out.write(archive.getInputStream(entry).bytes)
+                out.closeEntry()
+            }
+        }
+        if (extraEntry != null) {
+            out.putNextEntry(new java.util.zip.ZipEntry(extraEntry))
+            out.write([0xCA, 0xFE, 0xBA, 0xBE] as byte[])
+            out.closeEntry()
+        }
+    }
+}
+
+// The API is documented as usable on a dedicated server, so its class file must not name a client
+// package. This reads the constant pool of the packaged class, not a source comment.
+def checkNoClientReferences = { byte[] classBytes, String className ->
+    String text = new String(classBytes, 'ISO-8859-1')
+    ['net/minecraft/client/', 'net/neoforged/neoforge/client/', 'net/minecraftforge/client/'].each { forbidden ->
+        if (text.contains(forbidden)) {
+            throw new GradleException("${className} references client-only package ${forbidden}")
+        }
+    }
+}
+
+// Source artifact: exact canonical bytes plus the documented Maven identity.
+def checkSourceArtifact = { File jarFile, File pomFile ->
+    if (!jarFile.isFile()) {
+        throw new GradleException("missing bundled library artifact ${jarFile}; the build must not " +
+                'fall back to a different remote package')
+    }
+    byte[] data = jarFile.bytes
+    String digest = sha256Hex(data)
+    if (data.length != expressionLibBytes || digest != expressionLibSha256) {
+        throw new GradleException("${jarFile.name} is not the canonical ${expressionLibArtifact}-" +
+                "${expressionLibVersion} build (${data.length} bytes, sha256 ${digest}); expected " +
+                "${expressionLibBytes} bytes, sha256 ${expressionLibSha256}")
+    }
+    if (!pomFile.isFile()) {
+        throw new GradleException("missing bundled library POM ${pomFile}")
+    }
+    def pom = new groovy.xml.XmlSlurper(false, false).parse(pomFile)
+    def identity = [pom.groupId.text(), pom.artifactId.text(), pom.version.text(), pom.packaging.text()]
+    if (identity != [expressionLibGroup, expressionLibArtifact, expressionLibVersion, 'jar']) {
+        throw new GradleException("${pomFile.name} declares ${identity}; expected " +
+                "[${expressionLibGroup}, ${expressionLibArtifact}, ${expressionLibVersion}, jar]")
+    }
+    digest
+}
+
+// Nested library: JarJar copies the resolved bytes, so the nested archive must be the pinned one.
+def checkNestedLibrary = { byte[] nestedBytes ->
+    String digest = sha256Hex(nestedBytes)
+    if (nestedBytes.length != expressionLibBytes || digest != expressionLibSha256) {
+        throw new GradleException("nested ${expressionLibNestedPath} is not the pinned build " +
+                "(${nestedBytes.length} bytes, sha256 ${digest})")
+    }
+    Map<String, String> nested = new TreeMap<>()
+    new java.util.zip.ZipInputStream(new ByteArrayInputStream(nestedBytes)).withCloseable { stream ->
+        for (def entry = stream.nextEntry; entry != null; entry = stream.nextEntry) {
+            if (!entry.isDirectory()) nested[entry.name] = sha256Hex(readEntryBytes(stream))
+        }
+    }
+    Map<String, String> source = readEntryDigests(expressionLibSourceJar)
+    def missing = source.keySet().findAll { !nested.containsKey(it) }
+    def changed = source.keySet().findAll { nested.containsKey(it) && nested[it] != source[it] }
+    if (!missing.isEmpty() || !changed.isEmpty()) {
+        throw new GradleException("nested ${expressionLibNestedPath} does not match the canonical " +
+                "source entries (missing ${missing.size()}, changed ${changed.size()})")
+    }
+    Map<String, String> descriptors = [:]
+    new java.util.zip.ZipInputStream(new ByteArrayInputStream(nestedBytes)).withCloseable { stream ->
+        for (def entry = stream.nextEntry; entry != null; entry = stream.nextEntry) {
+            if (expressionLibDescriptors.contains(entry.name)) {
+                descriptors[entry.name] = new String(readEntryBytes(stream), 'UTF-8')
+            }
+        }
+    }
+    expressionLibDescriptors.each { descriptor ->
+        String text = descriptors[descriptor]
+        if (text == null) throw new GradleException("nested library is missing ${descriptor}")
+        [modId: expressionLibModId, version: expressionLibVersion, license: expressionLibLicense].each { key, value ->
+            if (!text.contains("${key}=\"${value}\"")) {
+                throw new GradleException("nested ${descriptor} does not declare ${key}=\"${value}\"")
+            }
+        }
+    }
+    [bytes: nestedBytes.length, digest: digest, entries: nested.size(), descriptors: descriptors.keySet().sort()]
+}
+
+def verifyExpressionLibArtifact = tasks.register('verifyExpressionLibArtifact') {
+    description = 'Checks that the bundled YiRanExpressionLib source artifact and POM are the canonical ones.'
+    group = 'verification'
+    inputs.file(expressionLibSourceJar)
+    inputs.file(expressionLibSourcePom)
+    doLast {
+        String digest = checkSourceArtifact(expressionLibSourceJar, expressionLibSourcePom)
+        logger.lifecycle("YiRanExpressionLib source artifact: ${expressionLibSourceJar.name}, " +
+                "${expressionLibSourceJar.length()} bytes, sha256 ${digest}")
+    }
+}
+
+def verifyExpressionLibResolution = tasks.register('verifyExpressionLibResolution') {
+    description = 'Checks that the library coordinate resolves from the pinned local artifact only.'
+    group = 'verification'
+    dependsOn verifyExpressionLibArtifact
+    def resolved = configurations.expressionLibResolution.incoming.artifactView { it.lenient(false) }.files
+    doLast {
+        Set<File> files = resolved.files
+        if (files.size() != 1) {
+            throw new GradleException("${expressionLibNotation} must resolve to exactly one file, got ${files}")
+        }
+        File resolvedFile = files.first()
+        if (resolvedFile.canonicalFile != expressionLibSourceJar.canonicalFile) {
+            throw new GradleException("${expressionLibNotation} resolved to ${resolvedFile} instead of the " +
+                    "pinned ${expressionLibSourceJar}; the build must not resolve this library from elsewhere")
+        }
+        logger.lifecycle("YiRanExpressionLib resolution: ${resolvedFile} (local exclusive content only)")
+    }
+}
+
+def verifyPackagedExpressionLib = tasks.register('verifyPackagedExpressionLib') {
+    description = 'Checks that the packaged mod jar nests exactly one library and those bytes are the pinned ones.'
+    group = 'verification'
+    dependsOn verifyExpressionLibArtifact
+    def jarTask = tasks.named('jar', Jar)
+    dependsOn jarTask
+    inputs.file(jarTask.flatMap { it.archiveFile })
+    doLast {
+        File packaged = jarTask.get().archiveFile.get().asFile
+        byte[] nestedBytes = null
+        new java.util.zip.ZipFile(packaged).withCloseable { archive ->
+            List<String> names = archive.entries().collect { it.name }
+            [expressionLibMetadataPath, expressionLibNestedPath].each { required ->
+                int count = names.count { it == required }
+                if (count != 1) {
+                    throw new GradleException("${required} must appear exactly once in ${packaged.name}, found ${count}")
+                }
+            }
+            List<String> nested = names.findAll { it.startsWith('META-INF/jarjar/') && it.endsWith('.jar') }.sort()
+            if (nested != [expressionLibNestedPath]) {
+                throw new GradleException("exactly one nested JAR ${expressionLibNestedPath} is allowed, found ${nested}")
+            }
+            def metadata = new groovy.json.JsonSlurper().parse(archive.getInputStream(archive.getEntry(expressionLibMetadataPath)))
+            if (!(metadata.jars instanceof List) || metadata.jars.size() != 1) {
+                throw new GradleException('JarJar metadata must contain exactly one nested library entry')
+            }
+            def entry = metadata.jars[0]
+            def identifier = entry.identifier ?: [:]
+            if (identifier.group != expressionLibGroup || identifier.artifact != expressionLibArtifact) {
+                throw new GradleException("JarJar identity must be ${expressionLibNotation}, got ${identifier}")
+            }
+            // This branch's actual JarJar archive has the same version schema as 1.21.1.
+            // Check both exact fields: a substring match would accept a wrong range or version.
+            def libraryVersion = entry.version ?: [:]
+            if (libraryVersion.range != expressionLibRange
+                    || libraryVersion.artifactVersion != expressionLibVersion) {
+                throw new GradleException("JarJar version must be range ${expressionLibRange} / " +
+                        "${expressionLibVersion}, got ${libraryVersion}")
+            }
+            if (entry.path != expressionLibNestedPath) {
+                throw new GradleException("JarJar path must be ${expressionLibNestedPath}, got ${entry.path}")
+            }
+            def apiEntry = archive.getEntry('daripher/autoleveling/api/LevelingApi.class')
+            if (apiEntry == null) {
+                throw new GradleException("packaged jar is missing daripher/autoleveling/api/LevelingApi.class")
+            }
+            checkNoClientReferences(archive.getInputStream(apiEntry).bytes, 'LevelingApi')
+            nestedBytes = archive.getInputStream(archive.getEntry(expressionLibNestedPath)).bytes
+        }
+        Map<String, Object> proof = checkNestedLibrary(nestedBytes)
+        logger.lifecycle("YiRanExpressionLib packaged proof: ${expressionLibNestedPath} " +
+                "${proof.bytes} bytes sha256 ${proof.digest} (canonical), ${proof.entries} entries " +
+                "identical to the source artifact, descriptors ${proof.descriptors}")
+    }
+}
+
+// Negative fixtures: prove the gates actually reject missing/tampered input, without touching the
+// accepted library in libs/maven.
+def verifyExpressionLibGateFixtures = tasks.register('verifyExpressionLibGateFixtures') {
+    description = 'Proves the library gates reject missing, truncated, tampered and re-packed inputs.'
+    group = 'verification'
+    def fixturesDir = expressionLibGateFixturesDir.get().asFile
+    outputs.dir(fixturesDir)
+    doLast {
+        fixturesDir.mkdirs()
+        byte[] canonical = expressionLibSourceJar.bytes
+        File truncated = new File(fixturesDir, 'truncated.jar')
+        truncated.bytes = Arrays.copyOf(canonical, canonical.length - 64)
+        File tampered = new File(fixturesDir, 'tampered.jar')
+        byte[] flipped = canonical.clone()
+        flipped[(int) (canonical.length / 2)] = (byte) (flipped[(int) (canonical.length / 2)] ^ 0xFF)
+        tampered.bytes = flipped
+        File extraEntry = new File(fixturesDir, 'extra-entry.jar')
+        copyEntries(expressionLibSourceJar, extraEntry, null, 'net/yiran/expressionlib/expr/Injected.class')
+        File missingEntry = new File(fixturesDir, 'missing-entry.jar')
+        copyEntries(expressionLibSourceJar, missingEntry, 'net/yiran/expressionlib/expr/Functions.class', null)
+        File wrongPom = new File(fixturesDir, 'wrong-identity.pom')
+        wrongPom.text = expressionLibSourcePom.getText('UTF-8').replace(
+                "<version>${expressionLibVersion}</version>", '<version>1.0.2</version>')
+
+        Map<String, Closure> cases = [
+                'missing source jar'     : { checkSourceArtifact(new File(fixturesDir, 'absent.jar'), expressionLibSourcePom) },
+                'truncated source jar'   : { checkSourceArtifact(truncated, expressionLibSourcePom) },
+                'flipped byte'           : { checkSourceArtifact(tampered, expressionLibSourcePom) },
+                'wrong POM identity'     : { checkSourceArtifact(expressionLibSourceJar, wrongPom) },
+                'extra nested entry'     : { checkNestedLibrary(extraEntry.bytes) },
+                'missing nested entry'   : { checkNestedLibrary(missingEntry.bytes) },
+                'truncated nested library': { checkNestedLibrary(truncated.bytes) },
+        ]
+        cases.each { label, check ->
+            try {
+                check()
+            } catch (Exception expected) {
+                logger.lifecycle("gate fixture rejected as expected: ${label} (${expected.class.simpleName})")
+                return
+            }
+            throw new GradleException("library gate accepted a bad fixture: ${label}")
+        }
+        checkSourceArtifact(expressionLibSourceJar, expressionLibSourcePom)
+        logger.lifecycle("library gate fixtures: ${cases.size()} negative cases rejected, canonical pair accepted")
+    }
+}
+
+tasks.named('check') { dependsOn verifyExpressionLibResolution, verifyExpressionLibGateFixtures }
+
+// Test-only runtime probe: the nested archive is extracted from the packaged jar and used to evaluate
+// an expression, so "the nested library loads" is evidence and not an assumption. The probe lives in
+// src/test, so it is never part of the distributable jar.
+def verifyNestedLibraryRuntime = tasks.register('verifyNestedLibraryRuntime', JavaExec) {
+    description = 'Loads the nested library out of the packaged jar and evaluates an expression with it.'
+    group = 'verification'
+    def jarTask = tasks.named('jar', Jar)
+    dependsOn 'testClasses', jarTask
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'daripher.autoleveling.gate.NestedLibraryProbe'
+    args jarTask.get().archiveFile.get().asFile.absolutePath, expressionLibNestedPath
+}
+
+tasks.named('build') { dependsOn verifyPackagedExpressionLib, verifyNestedLibraryRuntime }

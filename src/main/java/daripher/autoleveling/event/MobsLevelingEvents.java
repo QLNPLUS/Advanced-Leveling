@@ -1,6 +1,7 @@
 package daripher.autoleveling.event;
 
 import daripher.autoleveling.AutoLevelingMod;
+import daripher.autoleveling.api.LevelingApi;
 import daripher.autoleveling.config.AdvancedConfig;
 import daripher.autoleveling.config.Config;
 import daripher.autoleveling.data.DimensionsLevelingSettingsReloader;
@@ -52,7 +53,8 @@ import net.neoforged.fml.common.EventBusSubscriber;
 
 @EventBusSubscriber(modid = AutoLevelingMod.MOD_ID)
 public class MobsLevelingEvents {
-  private static final String LEVEL_TAG = "LEVEL";
+  /** Persisted NBT key holding the zero-based level; the displayed level is this value + 1. */
+  public static final String LEVEL_TAG = "LEVEL";
   private static final ContextKeySet ADDITIONAL_LOOT_PARAMS =
       new ContextKeySet.Builder()
           .required(LootContextParams.THIS_ENTITY)
@@ -295,11 +297,7 @@ public class MobsLevelingEvents {
   }
 
   public static boolean shouldShowLevel(Entity entity) {
-    Identifier entityId = EntityType.getKey(entity.getType());
-    List<String> blacklist = AdvancedConfig.getHiddenLevels();
-    if (blacklist.contains(entityId.toString())) return false;
-    String namespace = entityId.getNamespace();
-    return !blacklist.contains(namespace + ":*");
+    return !LevelingApi.isHidden(entity.getType());
   }
 
   public static boolean hasLevel(Entity entity) {

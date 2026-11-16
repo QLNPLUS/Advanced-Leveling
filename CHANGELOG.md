@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.3
+
+- Added a read-only `LevelingApi` for integrations: `displayLevel` returns the level this branch
+  displays (stored `LEVEL` plus one) and an empty result for players, hidden types, missing or
+  malformed levels and values that would overflow, without writing entity data.
+- Unified the `mobs.hidden_levels` rule (exact entity ID or `namespace:*`) behind that API, shared
+  with the existing display gate.
+- Replaced the bundled YiRanExpressionLib with the canonical 62,897 byte build
+  (`d797d9eaf22923b5f0d0d152b583aef3d60600bf349aa481a89ecd159255106a`), resolved only from
+  `libs/maven`, and added source, resolution and JarJar packaging gates that verify the nested
+  archive byte for byte, plus negative fixtures.
+- Enabled the mod's JUnit sourceset on the NeoForge test harness.
+- Publishing now happens only from a manual dispatch that uploads the artifact of the same build
+  run; a normal push builds and tests without publishing.
+
 ## 1.0.2
 
 - Added NeoForge 26.1.2 support.
